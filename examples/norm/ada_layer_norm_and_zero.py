@@ -15,7 +15,7 @@ def _align_up(n: int, alignment: int) -> int:
 def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
     N_inv = 1.0 / float(N)
 
-    @tilelang.jit(out_idx=[4] if not has_gate else [5], target="npuir")
+    @tilelang.jit(out_idx=[3] if not has_gate else [4], target="npuir")
     def _func(block_m, block_n):
         N_padded = _align_up(N, block_n)
         if not has_gate:
@@ -25,7 +25,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                 x: T.Tensor[(M, N_padded), dtype],
                 scale: T.Tensor[(M, N_padded), dtype],
                 shift: T.Tensor[(M, N_padded), dtype],
-                _dummy: T.Tensor[(1,), dtype],
                 y: T.Tensor[(M, N_padded), dtype],
             ):
                 with T.Kernel(T.ceildiv(M, block_m), is_npu=True) as (pid_m, _):
@@ -44,7 +43,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         offset_m = pid_m * block_m
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
-                        tile_size_n = T.min(block_n, N - no * block_n)
                         T.clear(x_tile)
 
                         T.copy(
@@ -73,7 +71,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         offset_m = pid_m * block_m
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
-                        tile_size_n = T.min(block_n, N - no * block_n)
                         T.clear(x_tile)
 
                         T.copy(
@@ -89,25 +86,25 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         T.copy(
                             scale[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
-                            scale_tile[0:tile_size_m, 0:tile_size_n],
+                            scale_tile[0:tile_size_m, 0:block_n],
                         )
                         T.vmul(x_tile, scale_tile, x_tile)
 
                         T.copy(
                             shift[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
-                            scale_tile[0:tile_size_m, 0:tile_size_n],
+                            scale_tile[0:tile_size_m, 0:block_n],
                         )
                         T.vadd(x_tile, scale_tile, x_tile)
                         T.copy(
-                            x_tile[0:tile_size_m, 0:tile_size_n],
+                            x_tile[0:tile_size_m, 0:block_n],
                             y[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
                         )
 
@@ -120,7 +117,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                 scale: T.Tensor[(M, N_padded), dtype],
                 shift: T.Tensor[(M, N_padded), dtype],
                 gate: T.Tensor[(M, N_padded), dtype],
-                _dummy: T.Tensor[(1,), dtype],
                 y: T.Tensor[(M, N_padded), dtype],
             ):
 
@@ -143,7 +139,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         offset_m = pid_m * block_m
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
-                        tile_size_n = T.min(block_n, N - no * block_n)
                         T.clear(x_tile)
 
                         T.copy(
@@ -172,7 +167,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         offset_m = pid_m * block_m
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
-                        tile_size_n = T.min(block_n, N - no * block_n)
                         T.clear(x_tile)
 
                         T.copy(
@@ -188,35 +182,35 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         T.copy(
                             scale[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
-                            scale_tile[0:tile_size_m, 0:tile_size_n],
+                            scale_tile[0:tile_size_m, 0:block_n],
                         )
                         T.vmul(x_tile, scale_tile, x_tile)
 
                         T.copy(
                             shift[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
-                            scale_tile[0:tile_size_m, 0:tile_size_n],
+                            scale_tile[0:tile_size_m, 0:block_n],
                         )
                         T.vadd(x_tile, scale_tile, x_tile)
 
                         T.copy(
                             gate[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
-                            scale_tile[0:tile_size_m, 0:tile_size_n],
+                            scale_tile[0:tile_size_m, 0:block_n],
                         )
                         T.vmul(x_tile, scale_tile, x_tile)
 
                         T.copy(
-                            x_tile[0:tile_size_m, 0:tile_size_n],
+                            x_tile[0:tile_size_m, 0:block_n],
                             y[
                                 offset_m : offset_m + tile_size_m,
-                                offset_n : offset_n + tile_size_n,
+                                offset_n : offset_n + block_n,
                             ],
                         )
 
@@ -295,8 +289,7 @@ def run_adaln_test(
     y_ref_padded[:, :N] = y_ref
 
     program = _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False)
-    dummy = torch.empty(1, dtype=torch_dtype, device=device)
-    y = program(block_m, block_n)(x, scale, shift, dummy)
+    y = program(block_m, block_n)(x, scale, shift)
 
     torch.testing.assert_close(
         y[:M, :N].float(),
@@ -363,8 +356,7 @@ def run_adaln_zero_test(
 
     # TileLang kernel
     program = _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=True)
-    dummy = torch.empty(1, dtype=torch_dtype, device=device)
-    y = program(block_m, block_n)(x, scale, shift, gate, dummy)
+    y = program(block_m, block_n)(x, scale, shift, gate)
 
     # Compare
     torch.testing.assert_close(
