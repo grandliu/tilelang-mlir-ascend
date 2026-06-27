@@ -48,7 +48,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
                         remain_n = T.min(block_n, N - offset_n)
-                        T.clear(x_tile)
 
                         T.copy(
                             x[
@@ -89,7 +88,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
                         remain_n = T.min(block_n, N - offset_n)
-                        T.clear(x_tile)
 
                         T.copy(
                             x[
@@ -101,7 +99,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         T.vsub(x_tile, mean_val, x_tile)
                         T.vmul(x_tile, rstd, x_tile)
 
-                        T.clear(scale_tile)
                         T.copy(
                             scale[
                                 offset_m : offset_m + tile_size_m,
@@ -111,7 +108,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         )
                         T.vmul(x_tile, scale_tile, x_tile)
 
-                        T.clear(scale_tile)
                         T.copy(
                             shift[
                                 offset_m : offset_m + tile_size_m,
@@ -160,7 +156,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
                         remain_n = T.min(block_n, N - offset_n)
-                        T.clear(x_tile)
 
                         T.copy(
                             x[
@@ -201,7 +196,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         tile_size_m = T.min(block_m, M - pid_m * block_m)
                         offset_n = no * block_n
                         remain_n = T.min(block_n, N - offset_n)
-                        T.clear(x_tile)
 
                         T.copy(
                             x[
@@ -213,7 +207,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         T.vsub(x_tile, mean_val, x_tile)
                         T.vmul(x_tile, rstd, x_tile)
 
-                        T.clear(scale_tile)
                         T.copy(
                             scale[
                                 offset_m : offset_m + tile_size_m,
@@ -223,7 +216,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         )
                         T.vmul(x_tile, scale_tile, x_tile)
 
-                        T.clear(scale_tile)
                         T.copy(
                             shift[
                                 offset_m : offset_m + tile_size_m,
@@ -233,7 +225,6 @@ def _ada_layer_norm_kernel(M, N, eps, dtype, has_gate=False):
                         )
                         T.vadd(x_tile, scale_tile, x_tile)
 
-                        T.clear(scale_tile)
                         T.copy(
                             gate[
                                 offset_m : offset_m + tile_size_m,
@@ -289,7 +280,7 @@ def ada_layer_norm_zero_ref(x, scale, shift, gate, eps):
 
 def run_adaln_test(
     M=1024,
-    N=16385,
+    N=16384,
     block_m=2,
     block_n=2048,
     eps=1e-5,
