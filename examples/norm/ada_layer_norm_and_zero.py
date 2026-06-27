@@ -1,4 +1,14 @@
-# backup
+"""Adaptive LayerNorm (AdaLN / AdaLN-Zero) kernel using TileLang.
+
+AdaLN:      y = scale * LayerNorm(x) + shift
+AdaLN-Zero: y = gate * (scale * LayerNorm(x) + shift)
+
+The `has_gate` parameter controls the variant:
+- has_gate=False → AdaLN
+- has_gate=True  → AdaLN-Zero
+
+The input N must be an integer multiple of block_n.
+"""
 
 import tilelang
 import tilelang.language as T
@@ -251,10 +261,10 @@ def ada_layer_norm_zero_ref(x, scale, shift, gate, eps):
 
 
 def run_adaln_test(
-    M=4096,
-    N=5000,
+    M=1024,
+    N=16384,
     block_m=2,
-    block_n=4096,
+    block_n=2048,
     eps=1e-5,
     dtype="float16",
     device="npu",
