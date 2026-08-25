@@ -73,7 +73,7 @@
 - 将 `T.Kernel(ceildiv(N, block_size))` 改成 `T.Kernel(num_cores)`。
 - 在每个物理 block 内用 `for i in T.serial(iters_per_core)` 迭代多个 logical block。
 - 将 `block_size` 与 `num_cores` 纳入搜索；`num_cores` 不能只测单点。
-- 至少覆盖 AI Core Count 附近、2x/4x/6x/8x AI Core Count、任务并发甜点区、低 imbalance 候选和当前 flat-grid 端点。
+- 至少覆盖 AI Core Count 附近、整数倍 AI Core Count、任务并发甜点区、低 imbalance 候选和当前 flat-grid 端点。
 
 `T.serial` 多块迭代提醒：
 

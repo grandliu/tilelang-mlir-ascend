@@ -81,11 +81,12 @@ Phase 2 是多轮闭环。优化点分析不做成一次性前置步骤；每轮
 4. 每个实验分支只改一个主要优化点。
 5. 每个实验分支跑 L0 精度回归。
 6. 对精度通过的分支，用 `msprof op` 采集目标 kernel 性能；若分支涉及 `Block Dim / num_cores / T.serial / T.Pipelined / multi-buffer` 等调度结构变化，同步采集 NPU event median，并按 [Profile-collection.md](Profile-collection.md) 检查 event 测量质量。
-7. 在同一 `(dispatch_path, workload_id)` 内比较 valid 分支；按本轮主指标选择候选 winner。kernel 内部优化默认看 `Task Duration(us)`；调度结构优化要求 event 不明显回退，若 event 清晰改善则优先保留，若 event 打平则用 `msprof Task Duration`、负载均衡和资源占用决胜。
-8. 候选 winner 更新为全局 current best 前，必须确认必测 dispatch 没有超过噪声阈值的性能回退；若只在部分 dispatch 提升但其它必测 dispatch 明显回退，不更新全局 current best，并记录 rollback/defer 原因。
-9. 若所有分支无提升、无效或阻塞，current best 保持不变。
-10. 记录本轮现象、候选优化点、实验分支、性能、精度、必测 dispatch 非回退检查和 winner/rollback 结论。
-11. 未满足终止条件则进入下一轮，重新分析当前现象。
+7. 若结构性分支正确性通过且方向有效，先围绕该结构暴露的关键参数做一轮 coarse autotune 或等价手动粗搜；再检查 autotune top-k 与 winner 邻域，必要时做手动/脚本精搜，最后把精搜 winner 作为该结构分支的候选版本复测。
+8. 在同一 `(dispatch_path, workload_id)` 内比较 valid 分支；按本轮主指标选择候选 winner。kernel 内部优化默认看 `Task Duration(us)`；调度结构优化要求 event 不明显回退，若 event 清晰改善则优先保留，若 event 打平则用 `msprof Task Duration`、负载均衡和资源占用决胜。
+9. 候选 winner 更新为全局 current best 前，必须确认必测 dispatch 没有超过噪声阈值的性能回退；若只在部分 dispatch 提升但其它必测 dispatch 明显回退，不更新全局 current best，并记录 rollback/defer 原因。
+10. 若所有分支无提升、无效或阻塞，current best 保持不变。
+11. 记录本轮现象、候选优化点、实验分支、性能、精度、必测 dispatch 非回退检查和 winner/rollback 结论。
+12. 未满足终止条件则进入下一轮，重新分析当前现象。
 
 终止条件：
 
@@ -136,7 +137,7 @@ block_size / DMA 效率问题
 
 ### Autotune 只用于参数选择
 
-autotune 只负责在给定搜索空间中选参数。若主要瓶颈是结构问题，先改结构，再按 [Autotune.md](Autotune.md) 搜索参数。
+autotune 只负责在给定搜索空间中选参数，不是最终裁判。若主要瓶颈是结构问题，先改结构；结构性分支通过正确性并显示方向有效后，再按 [Autotune.md](Autotune.md) 对该结构做 coarse search，随后检查 top-k 和 winner 邻域，最后用 `msprof op` 和必要的 NPU event 复测最终 winner。
 
 ### 经验结论不要过度泛化
 

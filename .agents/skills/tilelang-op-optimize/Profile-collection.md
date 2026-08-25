@@ -20,8 +20,8 @@
 - dtype 分支：fp16 / fp32。
 - fast path / fallback path。
 - axis、flag、layout 等参数触发的不同实现。
-- wrapper 选择不同 `@T.prim_func` kernel。
-- kernel launcher 选择不同 tilelang kernel。
+- config 分支
+   block_m、tile_n、block_size、num_cores 等参数是否导致 kernel 内不同 if/else。
 
 不要把普通 shape 大小差异当作 dispatch path，除非它确实触发了不同代码分支。
 
@@ -70,16 +70,14 @@ target_kernel_name = @T.prim_func 对应的函数名
 msprof op \
   --kernel-name={target_kernel_name} \
   --output={output_dir} \
-  --launch-count=15 \
+  --launch-count=20 \
   --warm-up=5 \
   --dump=off \
   --aic-metrics=BasicInfo,PipeUtilization,ArithmeticUtilization,Memory,MemoryUB,MemoryL0,L2Cache,ResourceConflictRatio \
   python {op}.py
 ```
 
-如果 `{op}.py` 没有 `--case` 入口，使用现有 main/level 参数固定目标 workload，并在日志中写清实际命令。
-
-Phase 2 复用本模板测试 current best 或实验分支时，`python {op}.py` 必须替换为本次实际要测的文件，例如 `python perf_opt/{op}_opt_v{iter}_{opt_id}.py`。日志中的 `command` 必须包含该分支路径，避免误测原始 Stage 3 文件。
+Phase 2 复用本模板测试 current best 或实验分支时，`python {op}.py` 必须替换为本次实际要测的文件，例如 `python {op}_opt_v{iter}_{opt_id}.py`。日志中的 `command` 必须包含该分支路径，避免误测原始 Stage 3 文件。
 
 实验迭代可用较小 `launch-count` 快速判断方向，但必须在日志中记录 launch 数；baseline、候选 winner 和 final 推荐使用更稳定的 launch 数复测。
 

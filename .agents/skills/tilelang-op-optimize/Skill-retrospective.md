@@ -85,7 +85,7 @@
 
 字段说明：
 
-- `area`：`profile-collection / Diagnose / bottleneck-patterns / autotune / SKILL / logging / stop_condition`
+- `area`：`Profile-collection / Iteration-diagnosis / Bottleneck-patterns / Autotune / SKILL / logging / stop_condition`
 - `issue`：本次暴露的问题，没有则写 `none`
 - `evidence`：来自 `opt_log.md`、profile 或实验分支的证据
 - `suggested_doc_change`：建议修改哪个文档，以及怎么改

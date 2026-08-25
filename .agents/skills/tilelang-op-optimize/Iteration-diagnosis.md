@@ -229,10 +229,12 @@ perf_opt/mish_opt_v2_op3.py
 
 如果某个优化点本质上是参数选择，可以在该分支内做小范围参数实验；但搜索空间必须服务同一个优化点，不能混入其它结构性改动。
 
+结构性优化分支通过正确性且方向有效后，不能只保留单个手写配置。必须围绕该结构暴露的关键参数做一轮 coarse autotune 或等价手动粗搜；例如 `T.serial` 多块迭代至少搜索 `block_size × num_cores`。autotune winner 不是最终结论，还要检查 top-k 配置和 winner 邻域，必要时手动/脚本精搜，再用最终 winner 进入 `msprof op` 和必要的 NPU event 复测。
+
 若优化点涉及 `num_cores / T.serial` 多块迭代，不能只测一个配置。先计算 `num_logical=ceildiv(N, block_size)`，再构造候选：
 
 - AI Core Count 附近和若干倍 AI Core Count。
-- 默认用 `4x/6x/8x AI Core Count` 作为任务并发锚点；只有硬件上下文或 profile 明确给出其它调度核口径时，才使用该口径修正。
+- 默认用 `整数倍 AI Core Count` 作为任务并发锚点；只有硬件上下文或 profile 明确给出其它调度核口径时，才使用该口径修正。
 - `num_logical` 附近可整除或低 imbalance 的候选，记录 `min_iters_per_task / max_iters_per_task`。
 - 当前 flat-grid 端点只作对照，不默认作为 winner。
 
@@ -263,7 +265,7 @@ profile 有效性校验
 - 单个配置无收益只能记为 `config_no_gain`；不能据此否定 `T.serial / T.Pipelined / num_cores` 这类整类方向。
 - 只有在关键配置已覆盖，或有明确机制证据时，才能记录为 `family_no_gain`。
 - 已被证明无收益的配置，下一轮不要重复尝试；整类方向只有在 `family_no_gain` 后才停止尝试，除非新的 current best profile 形态已经变化。
-- autotune 只在结构稳定或多个参数都合理时使用，不作为逃避现象分析的默认动作。
+- autotune 只在结构稳定或结构性分支已经通过正确性后使用，不作为逃避现象分析的默认动作。
 
 ---
 

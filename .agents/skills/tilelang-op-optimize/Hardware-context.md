@@ -4,7 +4,8 @@
 
 - NPU Architecture: Ascend 910B2C
 - Visible NPU Count: 16
-- AI Core Count per NPU: 24
+- AIC Core Count per NPU: 24
+- AIV Core Count per NPU: 48
 - AI Core Rated Frequency: 1800 MHz
 - Profiling Tool: msprof
 
