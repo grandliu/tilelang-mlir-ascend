@@ -42,8 +42,8 @@
 
 - `{op}.py`、current best 或当前实验分支 `perf_opt/{op}_opt_v{iter}_{opt_id}.py`。
 - `DESIGN.md` 中的性能目标章节。
-- [Hardware-context.md](Hardware-context.md) 中的硬件上下文。
-- 按 [Profile-collection.md](Profile-collection.md) 轻量多 dispatch 规则采集到的目标 kernel profiling 结果。
+- [hardware-context.md](hardware-context.md) 中的硬件上下文。
+- 按 [profile-collection.md](profile-collection.md) 轻量多 dispatch 规则采集到的目标 kernel profiling 结果。
 - 触发调度结构分析时，同一 workload 下的 NPU event median。
 - `perf_opt/opt_log.md` 中的 `Performance Test Data` 最小表。
 - 已尝试过的优化点、实验分支结果、keep/rollback 结论和最新 current best。
@@ -190,7 +190,7 @@ defer：证据不足，暂缓
 
 ## Step 4：匹配瓶颈模式
 
-如果当前现象需要模式参考，读取 [Bottleneck-patterns.md](Bottleneck-patterns.md)，用本轮诊断上下文辅助生成候选优化点。
+如果当前现象需要模式参考，读取 [bottleneck-patterns.md](bottleneck-patterns.md)，用本轮诊断上下文辅助生成候选优化点。
 
 匹配时注意：
 

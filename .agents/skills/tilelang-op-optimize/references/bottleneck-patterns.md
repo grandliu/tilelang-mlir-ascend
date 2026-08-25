@@ -2,7 +2,7 @@
 
 ## 用途
 
-本文件是 `tilelang-op-optimize` 的可迭代瓶颈模式参考。每轮诊断时，先按 [Iteration-diagnosis.md](Iteration-diagnosis.md) 建立本轮诊断上下文，再从本文件匹配可能的瓶颈模式。
+本文件是 `tilelang-op-optimize` 的可迭代瓶颈模式参考。每轮诊断时，先按 [iteration-diagnosis.md](iteration-diagnosis.md) 建立本轮诊断上下文，再从本文件匹配可能的瓶颈模式。
 
 这些模式不是固定分类树。一个 profile 可以同时匹配多个模式；每个匹配到的模式都可以生成一个或多个候选优化点，并在同一轮分别创建实验分支验证。
 
@@ -403,7 +403,7 @@ Host launcher 子模式：`BP_launcher_workspace_alloc`
 
 推荐动作：
 
-- 按 [Autotune.md](Autotune.md) 定义小而合法的搜索空间。
+- 按 [autotune.md](autotune.md) 定义小而合法的搜索空间。
 - winner 必须单独跑 `msprof op`；若参数涉及调度结构，还必须采集 NPU event，不能只用 autotune latency。
 
 验证指标：

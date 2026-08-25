@@ -22,12 +22,12 @@ description: "对精度已通过的 TileLang-NPUIR 算子做 Stage 4 性能调�
 
 按阶段读取，不要在启动时一次性读取所有资源：
 
-- Phase 0 加载上下文时读取：[Hardware-context.md](Hardware-context.md)
-- Phase 1 性能采集时读取：[Profile-collection.md](Profile-collection.md)
-- Phase 2 每轮现象分析时读取：[Iteration-diagnosis.md](Iteration-diagnosis.md)
-- Phase 2 生成候选优化点时按需读取：[Bottleneck-patterns.md](Bottleneck-patterns.md)
-- Phase 2 候选优化点包含 autotune 时读取：[Autotune.md](Autotune.md)
-- Phase 4 调优复盘时读取：[Skill-retrospective.md](Skill-retrospective.md)
+- Phase 0 加载上下文时读取：[hardware-context.md](references/hardware-context.md)
+- Phase 1 性能采集时读取：[profile-collection.md](references/profile-collection.md)
+- Phase 2 每轮现象分析时读取：[iteration-diagnosis.md](references/iteration-diagnosis.md)
+- Phase 2 生成候选优化点时按需读取：[bottleneck-patterns.md](references/bottleneck-patterns.md)
+- Phase 2 候选优化点包含 autotune 时读取：[autotune.md](references/autotune.md)
+- Phase 4 调优复盘时读取：[skill-retrospective.md](references/skill-retrospective.md)
 
 按需参考同类 skill：
 
@@ -39,7 +39,7 @@ description: "对精度已通过的 TileLang-NPUIR 算子做 Stage 4 性能调�
 
 ### Phase 0：加载上下文
 
-1. 读取 `{op}.py`、`DESIGN.md` 和 [Hardware-context.md](Hardware-context.md)。
+1. 读取 `{op}.py`、`DESIGN.md` 和 [hardware-context.md](references/hardware-context.md)。
 2. 判断算子类型：`cube / vector / mix`。
 3. 搜索同类算子或历史优化实现，尤其关注：
    - `T.serial`
@@ -51,7 +51,7 @@ description: "对精度已通过的 TileLang-NPUIR 算子做 Stage 4 性能调�
 
 ### Phase 1：采集初始 baseline
 
-按 [Profile-collection.md](Profile-collection.md) 执行轻量多 dispatch 采集：
+按 [profile-collection.md](references/profile-collection.md) 执行轻量多 dispatch 采集：
 
 ```text
 找出真实 dispatch path
@@ -76,11 +76,11 @@ Phase 2 是多轮闭环。优化点分析不做成一次性前置步骤；每轮
 每轮执行：
 
 1. 固定本轮 base：当前 best 版本和它的最新 profile。
-2. 读取 [Iteration-diagnosis.md](Iteration-diagnosis.md)，基于 base profile 整理当前现象；生成候选优化点时按需查阅 [Bottleneck-patterns.md](Bottleneck-patterns.md)。
+2. 读取 [iteration-diagnosis.md](references/iteration-diagnosis.md)，基于 base profile 整理当前现象；生成候选优化点时按需查阅 [bottleneck-patterns.md](references/bottleneck-patterns.md)。
 3. 从同一个 base 派生多个实验分支：`perf_opt/{op}_opt_v{iter}_{opt_id}.py`。
 4. 每个实验分支只改一个主要优化点。
 5. 每个实验分支跑 L0 精度回归。
-6. 对精度通过的分支，用 `msprof op` 采集目标 kernel 性能；若分支涉及 `Block Dim / num_cores / T.serial / T.Pipelined / multi-buffer` 等调度结构变化，同步采集 NPU event median，并按 [Profile-collection.md](Profile-collection.md) 检查 event 测量质量。
+6. 对精度通过的分支，用 `msprof op` 采集目标 kernel 性能；若分支涉及 `Block Dim / num_cores / T.serial / T.Pipelined / multi-buffer` 等调度结构变化，同步采集 NPU event median，并按 [profile-collection.md](references/profile-collection.md) 检查 event 测量质量。
 7. 若结构性分支正确性通过且方向有效，先围绕该结构暴露的关键参数做一轮 coarse autotune 或等价手动粗搜；再检查 autotune top-k 与 winner 邻域，必要时做手动/脚本精搜，最后把精搜 winner 作为该结构分支的候选版本复测。
 8. 在同一 `(dispatch_path, workload_id)` 内比较 valid 分支；按本轮主指标选择候选 winner。kernel 内部优化默认看 `Task Duration(us)`；调度结构优化要求 event 不明显回退，若 event 清晰改善则优先保留，若 event 打平则用 `msprof Task Duration`、负载均衡和资源占用决胜。
 9. 候选 winner 更新为全局 current best 前，必须确认必测 dispatch 没有超过噪声阈值的性能回退；若只在部分 dispatch 提升但其它必测 dispatch 明显回退，不更新全局 current best，并记录 rollback/defer 原因。
@@ -103,7 +103,7 @@ Phase 2 是多轮闭环。优化点分析不做成一次性前置步骤；每轮
 
 ### Phase 4：调优复盘与最终交付
 
-1. 读取 [Skill-retrospective.md](Skill-retrospective.md)。
+1. 读取 [skill-retrospective.md](references/skill-retrospective.md)。
 2. 回看 `perf_opt/opt_log.md` 中的 baseline、多 dispatch 数据、候选优化点、实验分支、winner、rollback、blocked、`config_no_gain` 和 `family_no_gain`。
 3. 判断本次调优是否暴露出 skill 流程问题。
 4. 判断是否需要提出新的 `BP_xxx`，或更新已有 `BP_xxx`。
@@ -137,11 +137,11 @@ block_size / DMA 效率问题
 
 ### Autotune 只用于参数选择
 
-autotune 只负责在给定搜索空间中选参数，不是最终裁判。若主要瓶颈是结构问题，先改结构；结构性分支通过正确性并显示方向有效后，再按 [Autotune.md](Autotune.md) 对该结构做 coarse search，随后检查 top-k 和 winner 邻域，最后用 `msprof op` 和必要的 NPU event 复测最终 winner。
+autotune 只负责在给定搜索空间中选参数，不是最终裁判。若主要瓶颈是结构问题，先改结构；结构性分支通过正确性并显示方向有效后，再按 [autotune.md](references/autotune.md) 对该结构做 coarse search，随后检查 top-k 和 winner 邻域，最后用 `msprof op` 和必要的 NPU event 复测最终 winner。
 
 ### 经验结论不要过度泛化
 
-具体策略细节以 [Bottleneck-patterns.md](Bottleneck-patterns.md) 为准。某个优化点在当前环境失败，只能记录为当前 workload / TileLang-NPUIR / CANN / Developer 模式下的实测结论。
+具体策略细节以 [bottleneck-patterns.md](references/bottleneck-patterns.md) 为准。某个优化点在当前环境失败，只能记录为当前 workload / TileLang-NPUIR / CANN / Developer 模式下的实测结论。
 
 ## 日志最小要求
 

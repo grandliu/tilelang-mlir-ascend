@@ -4,7 +4,7 @@
 
 在算子性能调优完成后读取本文件。目标是复盘本次调优过程是否暴露出 skill 流程问题，并判断是否需要提出新的 `BP_xxx` 瓶颈模式。
 
-本文件只用于生成复盘记录和改进建议，不自动修改 `SKILL.md`、`Iteration-diagnosis.md`、`Profile-collection.md`、`Bottleneck-patterns.md` 或 `Autotune.md`。只有用户明确要求时，才把建议合入 skill 文档。
+本文件只用于生成复盘记录和改进建议，不自动修改 `SKILL.md`、`iteration-diagnosis.md`、`profile-collection.md`、`bottleneck-patterns.md` 或 `autotune.md`。只有用户明确要求时，才把建议合入 skill 文档。
 
 ---
 
@@ -38,8 +38,8 @@
 - 是否有分支一次混入多个主要优化点，导致无法归因。
 - 是否把单个 `config_no_gain` 错误扩大成 `family_no_gain`。
 - `T.serial / num_cores / pipeline` 等结构候选是否完成足够配置覆盖；`num_cores` 是否分析了任务并发不足、甜点区、派发开销过高和整除性。
-- `Bottleneck-patterns.md` 是否缺少某类现象或动作。
-- `Autotune.md` 的触发时机是否正确。
+- `bottleneck-patterns.md` 是否缺少某类现象或动作。
+- `autotune.md` 的触发时机是否正确。
 - stop_reason 是否有 profile 和实验记录支撑。
 - 日志模板是否足够复现 winner 选择。
 
@@ -52,7 +52,7 @@
 只有满足以下条件，才提出新的 `BP_xxx`：
 
 - 它解释了本次真实 profile 现象。
-- 现有 [Bottleneck-patterns.md](Bottleneck-patterns.md) 不能很好覆盖。
+- 现有 [bottleneck-patterns.md](bottleneck-patterns.md) 不能很好覆盖。
 - 它能对应明确的优化动作。
 - 它有可验证指标。
 - 它不是单个算子的偶然实现细节。
@@ -93,7 +93,7 @@
 - `type`：`new_bp / update_bp / none`
 - `source_case`：触发该建议的 operator、dispatch、workload 或实验分支
 - `summary`：模式或更新建议的一句话说明
-- `target_doc`：通常为 `Bottleneck-patterns.md`
+- `target_doc`：通常为 `bottleneck-patterns.md`
 
 ---
 
