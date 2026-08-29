@@ -12,8 +12,8 @@ T.interleave(src1, src2, ..., dst, channel_nums=2, size=[])
 
 ### 2.1 参数说明
 
-| 参数名            | 类型     | 说明                                              |
-| ----------------- | -------- | ------------------------------------------------- |
+| 参数名              | 类型       | 说明                                              |
+| ------------------- | ---------- | ------------------------------------------------- |
 | `src1, src2, ...` | `tensor` | 输入tensor列表，所有输入tensor必须具有相同的shape |
 | `dst`             | `tensor` | 输出tensor                                        |
 | `channel_nums`    | `int`    | 每个输入在每次交错中参与的通道数，默认为2         |
@@ -23,9 +23,9 @@ T.interleave(src1, src2, ..., dst, channel_nums=2, size=[])
 
 #### 2.2.1 DataType支持
 
-|        | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | fp16 | fp32 | bf16 | bool/int |
-| ------ | ----- | ---- | ------ | ----- | ------ | ----- | ------ | ----- | ---- | ---- | ---- | -------- |
-| Ascend | √     | √    | √      | √     | √      | √     | √      | √     | √    | √    | √    | √        |
+|        | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | fp16 | fp32 | bf16 | bool |
+| ------ | ----- | ---- | ------ | ----- | ------ | ----- | ------ | ----- | ---- | ---- | ---- | ---- |
+| Ascend | ×    | ×   | √     | √    | √     | √    | √     | √    | √   | √   | √   | ×   |
 
 #### 2.2.2 Shape支持
 
@@ -36,6 +36,7 @@ T.interleave(src1, src2, ..., dst, channel_nums=2, size=[])
 - 由于硬件限制，目前仅支持两个tensor的交错操作
 - 输入tensor的shape必须相同
 - 输出tensor的shape会根据输入tensor的shape和channel_nums自动计算
+- interleave仅支持Expert模式使用
 
 ### 2.4 使用方法
 
@@ -54,9 +55,9 @@ def vinterleave_kernel(M, N, dtype):
     ):
 
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
-            A_ub = T.alloc_shared((M, N), dtype)
-            B_ub = T.alloc_shared((M, N), dtype)
-            C_ub = T.alloc_shared((M, N * 2), dtype)
+            A_ub = T.alloc_ub((M, N), dtype)
+            B_ub = T.alloc_ub((M, N), dtype)
+            C_ub = T.alloc_ub((M, N * 2), dtype)
 
             T.copy(A, A_ub)
             T.copy(B, B_ub)

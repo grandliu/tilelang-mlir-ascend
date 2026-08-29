@@ -12,8 +12,8 @@ T.gather(src, dst, indices,[m,n])
 
 ### 2.1 参数说明
 
-| 参数名    | 类型         | 说明                     |
-| --------- | ------------ | ------------------------ |
+| 参数名      | 类型           | 说明                     |
+| ----------- | -------------- | ------------------------ |
 | `src`     | `tensor`     | 输入tensor               |
 | `dst`     | `tensor`     | 输出tensor               |
 | `indices` | `list/tuple` | gather 操作的索引数组    |
@@ -25,9 +25,13 @@ T.gather(src, dst, indices,[m,n])
 
 |        | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | fp16 | fp32 | bf16 | bool/int1 |
 | ------ | ----- | ---- | ------ | ----- | ------ | ----- | ------ | ----- | ---- | ---- | ---- | --------- |
-| Ascend | ×    | ×   | ×     | √    | ×     | √    | ×     | ×    | √   | √   | √   | ×        |
+| Ascend | ×    | ×   | √     | √    | √     | √    | ×     | ×    | √   | √   | √   | ×        |
 
-### 2.3 使用方法
+### 2.3 特殊限制说明
+
+- gather仅支持Expert模式使用
+
+### 2.4 使用方法
 
 以下示例实现了对输入矩阵沿最后一维做gather操作（indices固定为1）的结果。
 
@@ -42,9 +46,9 @@ def gather_dev(M, N, dtype="float16"):
         B: T.Tensor((M, N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
-            A_VEC = T.alloc_shared((M, N), dtype)
-            B_VEC = T.alloc_shared((M, N), dtype)
-            indices = T.alloc_shared((M, N), "int32")
+            A_VEC = T.alloc_ub((M, N), dtype)
+            B_VEC = T.alloc_ub((M, N), dtype)
+            indices = T.alloc_ub((M, N), "int32")
             value_one = 1
             T.npuir_brc(value_one, indices)
             T.copy(A, A_VEC)

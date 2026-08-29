@@ -25,11 +25,11 @@ T.reduce_sum(buffer, out, dim=-1, clear=True)
 
 |        | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | fp16 | fp32 | bf16 | bool/int1 |
 | ------ | ----- | ---- | ------ | ----- | ------ | ----- | ------ | ----- | ---- | ---- | ---- | --------- |
-| Ascend | ×     | ×    | ×      | ×     | ×      | ×     | ×      | ×     | √    | √    | ×    | ×         |
+| Ascend | √     | √    | √      | √     | √      | √     | √      | √     | √    | √    | ×    | ×         |
 
 #### 2.2.2 Shape支持
 
-结论：输出tensor的shape为输入tensor的shape在指定维度上归约后的结果
+结论：`src` 与 `dst` 必须同 rank；`dst` 在归约维上的尺寸为 1（如 `(M, N) → (M, 1)`）
 
 ### 2.3 特殊限制说明
 
@@ -47,12 +47,12 @@ def reduce_sum_kernel(M, N, dtype):
     @T.prim_func
     def main(
         src: T.Tensor((M, N), dtype),
-        dst: T.Tensor((M,), dtype),
+        dst: T.Tensor((M, 1), dtype),
     ):
 
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             src_ub = T.alloc_shared((M, N), dtype)
-            dst_ub = T.alloc_shared((M,), dtype)
+            dst_ub = T.alloc_shared((M, 1), dtype)
 
             T.copy(src, src_ub)
             T.reduce_sum(src_ub, dst_ub, dim=-1, clear=True)

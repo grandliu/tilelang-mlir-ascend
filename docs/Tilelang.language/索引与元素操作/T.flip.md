@@ -22,13 +22,17 @@ T.flip(src, dst, axis: int)
 
 |              | int8 | int16 | int32 | uint8 | uint16 | uint32 | uint64 | int64 | fp16 | fp32 | fp64 | bf16 | bool |
 | :----------- | :--: | :---: | :---: | :---: | :----: | :----: | :----: | :---: | :--: | :--: | :--: | :--: | :--: |
-| Ascend A2/A3 |   ×   |    ×   |    ×  |    ×   |   ×    |   ×    |   ×    |    ×  |  √   |  √   |  ×   |  ×  |   ×  |
+| Ascend A2/A3 |   √   |    √   |    √  |    √   |   √    |   √    |   √    |    √  |  √   |  √   |  ×   |  √  |   ×  |
 
 ### 2.3 Shape支持
 
 仅支持 1~5 维 tensor
 
-### 2.4 使用方法
+### 2.4 特殊限制说明
+
+- flip 仅支持 Expert 模式（`TILELANG_ASCEND_MODE=expert` 或不设置）；Developer 模式下编译失败（`'hivm.hir.vflip' op expected the number of tensor results (0) to be equal to the number of output tensors (1)`）
+
+### 2.5 使用方法
 
 ```python
 @tilelang.jit(target="npuir")
@@ -53,4 +57,4 @@ def vec_flip(block_M, block_N, dtype="float16"):
 
 ## 3. Tilelang Op到Ascend NPU IR Op的转换
 
-`tilelang::flip` Op 将被转换为 `hivm.hir.vfip` Op
+`tilelang::flip` Op 将被转换为 `hivm.hir.vflip` Op（VFlipOp）

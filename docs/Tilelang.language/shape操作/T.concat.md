@@ -30,7 +30,7 @@ T.concat(src_1, src_2, ..., src_N, dst, concat_dim)
 
 ### 2.3 特殊限制说明
 
-无
+- concat 仅支持 Expert 模式（`TILELANG_ASCEND_MODE=expert` 或不设置）；Developer 模式下编译失败（`'hivm.hir.vconcat' op expected the number of tensor results (0) to be equal to the number of output tensors (1)`）
 
 ### 2.4 使用方法
 

@@ -26,7 +26,7 @@ T.reduce_max(buffer, out, dim=-1, size=[], clear=True)
 
 |   | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | fp16 | fp32 | bf16 | bool/int1 |
 | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| Ascend | × | × | × | × | × | × | × | × | √ | √ | × | × |
+| Ascend | √ | √ | √ | √ | √ | √ | √ | √ | √ | √ | × | × |
 
 #### 2.2.2 Shape支持
 
@@ -55,7 +55,8 @@ def reduce_max_kernel(M, N, dtype, accum_dtype):
             s = T.alloc_shared((M, 1), accum_dtype)
 
             T.copy(B, b)
-            T.reduce_max(b, s, dim=1, clear=False)
+            # s 未初始化，此处必须 clear=True（clear=False 会在未初始化内存上累加）
+            T.reduce_max(b, s, dim=1, clear=True)
             T.copy(s, O)
 
     return main

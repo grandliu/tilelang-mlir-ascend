@@ -58,4 +58,7 @@ def vec_tanh(M, N, dtype):
 
 ## 3. Tilelang Op到Ascend NPU IR Op的转换
 
-**tilelang::vtanhOp**将被转换为arith::ConstantOp、arith::DivFOp、hivm::VMulOp、hivm::VAddOp
+**tilelang::vtanhOp**的转换按模式分派：
+
+- Developer 模式：`arith::ConstantOp`、`hivm::VExpOp`、`hivm::VSubOp`、`hivm::VAddOp`、`hivm::VMulOp`、`hivm::VDivOp`（`tanh(x) = (exp(2x)-1)/(exp(2x)+1)`）
+- Expert 模式：`arith::ConstantOp`、`hivm::VMulOp`、`hivm::VAddOp`（多项式逼近）

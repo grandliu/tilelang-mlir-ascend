@@ -32,7 +32,7 @@ T.deinterleave(src, *dsts, channel_nums=2, index_mode="ALL_CHANNELS", size=[])
 
 |              | int8 | int16 | int32 | uint8 | uint16 | uint32 | uint64 | int64 | fp16 | fp32 | fp64 | bf16 | bool |
 |:-------------|:----:|:-----:|:-----:|:-----:|:------:|:------:|:------:|:-----:|:----:|:----:|:----:|:----:|:----:|
-| Ascend A2/A3 |  ×   |   ×   |   ×   |   ×   |   ×    |   ×    |   ×    |   ×   |  √   |  √   |  ×   |  ×   |  ×   |
+| Ascend A2/A3 |  √   |   √   |   √   |   ×   |   √    |   √    |   √    |   √   |  √   |  √   |  ×   |  √   |  ×   |
 
 #### 2.2.2 Shape 支持
 
@@ -40,7 +40,7 @@ T.deinterleave(src, *dsts, channel_nums=2, index_mode="ALL_CHANNELS", size=[])
 
 ### 2.3 特殊限制说明
 
-无
+- deinterleave 仅支持 Expert 模式（`TILELANG_ASCEND_MODE=expert` 或不设置）；Developer 模式下编译失败（`'hivm.hir.vdeinterleave' op expected the number of tensor results (0) to be equal to the number of output tensors (1)`）
 
 ### 2.4 使用方法
 
