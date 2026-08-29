@@ -93,6 +93,10 @@ from .customize_npuir import (
     npuir_shl as vshl,  # noqa: F401
     npuir_shr,  # noqa: F401
     npuir_shr as vshr,  # noqa: F401
+    npuir_floor,  # noqa: F401
+    npuir_floor as vfloor,  # noqa: F401
+    npuir_floordiv,  # noqa: F401
+    npuir_floordiv as vfloordiv,  # noqa: F401
     npuir_exp,  # noqa: F401
     npuir_exp as vexp,  # noqa: F401
     npuir_dot,  # noqa: F401
@@ -126,6 +130,8 @@ from .customize_npuir import (
     reduce_absmax,  # noqa: F401, F811
     npuir_cumsum,  # noqa: F401
     npuir_cumsum as cumsum,  # noqa: F401, F811
+    npuir_sort,  # noqa: F401
+    npuir_sort as vsort,  # noqa: F401
     npuir_clamp,  # noqa: F401
     npuir_clamp as vclamp,  # noqa: F401
     npuir_atomic_add,  # noqa: F401

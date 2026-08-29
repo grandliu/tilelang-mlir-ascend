@@ -125,6 +125,7 @@ NPUIR_BINARY_OP_CLASS(And)
 NPUIR_BINARY_OP_CLASS(Xor)
 NPUIR_BINARY_OP_CLASS(Pow)
 NPUIR_BINARY_OP_CLASS(Shl)
+NPUIR_BINARY_OP_CLASS(FloorDiv)
 
 #define NPUIR_UNARY_OP_CLASS(OPNAME)                                           \
   class Npuir##OPNAME : public Operator {                                      \
@@ -146,6 +147,7 @@ NPUIR_UNARY_OP_CLASS(Rsqrt)
 NPUIR_UNARY_OP_CLASS(Abs)
 NPUIR_UNARY_OP_CLASS(Rec)
 NPUIR_UNARY_OP_CLASS(Not)
+NPUIR_UNARY_OP_CLASS(Floor)
 
 class NpuirDot : public Operator {
 public:
@@ -345,6 +347,21 @@ public:
   Array<Range> src_range, dst_range;
 };
 
+/// HIVM vector sort operation.
+/// Sort the sorting axis of src, output sorted values and original indices.
+class NpuirSort : public Operator {
+public:
+  NpuirSort(Array<PrimExpr> args, BufferMap vmap);
+
+  static const Op &Get();
+
+  Buffer src, dst_value, dst_index;
+  bool descending;
+  int64_t sort_axis;
+
+  Array<Range> src_range, dst_value_range, dst_index_range;
+};
+
 class NpuirAtomicAdd : public Operator {
 public:
   NpuirAtomicAdd(Array<PrimExpr> args, BufferMap vmap);
@@ -434,6 +451,20 @@ public:
   Buffer src, dst, indices;
 
   Array<Range> src_range, dst_range, indices_range;
+};
+
+/// A5 phase-1 SIMT indirect load.
+/// Load X[IDX_UB[i]] from GM and materialize the result into O_UB[i].
+class NpuirIndirectLoad : public Operator {
+public:
+  NpuirIndirectLoad(Array<PrimExpr> args, BufferMap vmap);
+
+  static const Op &Get();
+
+  Buffer src, indices_ub, dst_ub;
+  PrimExpr valid_extent;
+
+  Array<Range> src_range, indices_ub_range, dst_ub_range;
 };
 
 /// HIVM vector transpose operation

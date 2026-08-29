@@ -409,6 +409,33 @@ def npuir_not(A, B):
     return AscendUnaryOp("not", A, B).buildTirCall()
 
 
+def npuir_floor(A, B):
+    """Element-wise floor: B = floor(A).
+
+    Args:
+        A: Input tensor
+        B: Output tensor
+
+    Returns:
+        tir.Call: The TIR call for the floor operation
+    """
+    return AscendUnaryOp("floor", A, B).buildTirCall()
+
+
+def npuir_floordiv(A, B, C):
+    """Element-wise floor division: C = floor(A / B).
+
+    Args:
+        A: First input tensor
+        B: Second input tensor or scalar value
+        C: Output tensor
+
+    Returns:
+        tir.Call: The TIR call for the floor division operation
+    """
+    return AscendBinaryOp("floordiv", A, B, C).buildTirCall()
+
+
 def npuir_exp2(A, B, Tmp):
     """Compute exp2(A) = exp(A * ln(2)).
 
@@ -1053,6 +1080,48 @@ def npuir_cumsum(
         dst_tmp,
         str(dim),
         reverse,
+    )
+
+
+def npuir_sort(
+    src,
+    dst_value,
+    dst_index,
+    descending: bool = False,
+    sort_axis: int = -1,
+):
+    """Sort input along sort_axis, output sorted values and original indices.
+
+    Args:
+        src (Union[tir.Buffer, tir.BufferLoad, tir.BufferRegion]): Input tensor
+        dst_value (Union[tir.Buffer, tir.BufferLoad]): Output tensor storing
+            sorted values, same dtype as src.
+        dst_index (Union[tir.Buffer, tir.BufferLoad]): Output tensor storing
+            the original index corresponding to each sorted value (int32/int64).
+        descending (bool, optional): Sort order. False=ascending (default),
+            True=descending.
+        sort_axis (int, optional): Axis to sort. -1 = last axis (default).
+            Currently only the tail axis is supported by the hardware.
+
+    Returns:
+        tir.Call: The TIR call for the sort operation
+    """
+    src_extent = _get_extent(src)
+    val_extent = _get_extent(dst_value)
+    idx_extent = _get_extent(dst_index)
+
+    src_region = _to_region(src, "r", src_extent)
+    dst_value_region = _to_region(dst_value, "w", val_extent)
+    dst_index_region = _to_region(dst_index, "w", idx_extent)
+
+    return tir.call_intrin(
+        "handle",
+        tir.op.Op.get("tl.npuir_sort"),
+        src_region,
+        dst_value_region,
+        dst_index_region,
+        descending,
+        sort_axis,
     )
 
 
