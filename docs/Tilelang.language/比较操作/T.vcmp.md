@@ -36,7 +36,6 @@ T.vcmp(A, B, C, cmp_mod)
 - cmp_mod必须是以下之一："eq", "ne", "lt", "gt", "ge", "le"
 - 输入tensor A和B的shape必须相同
 - 输出tensor C的dtype为bool类型
-- 输入仅支持 fp16/fp32/int16/int32/int64/bf16（uint8/int8/uint16/uint32/uint64 编译失败）
 - 输出为 bool 类型时不可直接写回 GM（i1 无法 load/store GM，编译失败），需配合 `T.vselect` 等在片上使用
 
 ### 2.4 使用方法

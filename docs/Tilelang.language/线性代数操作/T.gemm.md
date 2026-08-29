@@ -15,8 +15,8 @@ T.npuir_dot(src1, src2, dst, size=[], initC=False, a_transpose=False, b_transpos
 
 | 参数名  | 类型  | 说明  |
 | ------------ | ------------ | ------------ |
-| `src1` | `tensor`| 输入tensor, `fp16`、`bf16`、`int8` 或 `fp32`（HF32 路径），不支持 `int32` |
-| `src2` | `tensor`| 输入tensor, `fp16`、`bf16`、`int8` 或 `fp32`（HF32 路径），不支持 `int32` |
+| `src1` | `tensor`| 输入tensor, `fp16`、`bf16`、`int8` 或 `fp32`（HF32 路径），dtype 支持见 2.2.1 |
+| `src2` | `tensor`| 输入tensor, `fp16`、`bf16`、`int8` 或 `fp32`（HF32 路径），dtype 支持见 2.2.1 |
 | `dst` | `tensor` | 输出tensor, 对应 `fp32`（fp16/bf16/fp32输入）或 `int32`（int8输入） |
 |`size`|`shape`|如果size=[a, b, c], 则 `src1`的shape为[a, b]或[b, a], `src2`的shape为[b, c]或[c, b], `dst`的shape为[a, c]|
 | `initC` | `bool` | 是否对dst清零。`initC`=True表示dst=src1@src2; `initC`=False表示dst=src1@src2+dst|

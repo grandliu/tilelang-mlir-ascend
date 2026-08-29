@@ -16,7 +16,7 @@ T.pad(src, dst, pad_value, low, high, size)
 |-------|----------|------|
 | `src` | `tensor` | 源张量  |
 | `dst` | `tensor` | 目的张量 |
-| `pad_value` | 类型化标量常量 | 填充值，必须是类型化常量（如 `T.float16(0)`、`T.int32(0)`），且类型与数据 dtype 一致；Python 字面量（如 `0.0`、`0`）不可用 |
+| `pad_value` | 类型化标量常量 | 填充值（如 `T.float16(0)`），约束详见 2.3 特殊限制说明 |
 | `low` | `List[Union[int, tir.Var]]` 或 `Tuple[...]` | 沿各维度「起始端」的 padding 长度 |
 | `high` | `List[Union[int, tir.Var]]` 或 `Tuple[...]` | 沿各维度「结束端」的 padding 长度 |
 | `size`(可选) | `List[int]`，默认 `[]` | 手动指定 src 的逻辑 shape

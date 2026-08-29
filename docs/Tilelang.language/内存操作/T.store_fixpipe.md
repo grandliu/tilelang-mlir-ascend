@@ -35,7 +35,7 @@ T.store_fixpipe(src, dst, size=[], enable_nz2nd=False, channel_split=False, pre_
 |:-------------|:----:|:-----:|:-----:|:-----:|:------:|:------:|:------:|:-----:|:----:|:----:|:----:|:----:|:----:|
 | Ascend A2/A3 |  √   |   ×   |   √   |   ×   |   ×    |   ×    |   ×    |   ×   |  √   |  √   |  ×   |  √   |  ×   |
 
-注：表中 `fp32` / `int32` 指 L0C `src` 侧类型；`fp16` / `bf16` / `int8` 作为 `dst` 时分别走 `f32→f16` / `f32→bf16` 量化与 `i32→i8` 反量化路径（`f32→f16` 量化路径实测数值正确）。
+注：表中 `fp32` / `int32` 指 L0C `src` 侧类型；`fp16` / `bf16` / `int8` 作为 `dst` 侧类型时走量化/反量化路径，合法配对见 2.1 约束。
 
 #### 2.2.2 Shape 支持
 
@@ -44,7 +44,8 @@ T.store_fixpipe(src, dst, size=[], enable_nz2nd=False, channel_split=False, pre_
 
 ### 2.3 特殊限制说明
 
-- `src`/`dst` dtype 仅允许四种组合：同 dtype、`f32→f16`（量化）、`f32→bf16`（量化）、`i32→i8`（反量化），其余组合触发前端断言 `Unexpected pre-quant mode in npuir_store_fixpipe`
+- `src`/`dst` dtype 不满足 2.1 中的四种合法组合时，触发前端断言 `Unexpected pre-quant mode in npuir_store_fixpipe`
+- `f32→f16` 量化路径实测数值正确
 
 ### 2.4 使用方法
 

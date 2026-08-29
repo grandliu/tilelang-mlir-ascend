@@ -15,7 +15,7 @@ T.vshr(A, B, C)
 | 参数名  | 类型  | 说明  |
 | ------------ | ------------ | ------------ |
 | `A` | `tensor` | 输入tensor  |
-| `B` | `tensor` | 移位位数tensor（标量暂不支持，标量需求请用 shape=(1,) 的 tensor 承载）  |
+| `B` | `tensor` | 移位位数tensor（shape 约束见 2.2.2）  |
 | `C` | `tensor` | 输出tensor  |
 
 ### 2.2 支持规格

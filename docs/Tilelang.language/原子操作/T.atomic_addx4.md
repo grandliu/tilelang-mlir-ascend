@@ -32,7 +32,7 @@ T.atomic_addx4(dst, src, size=[])
 
 ### 2.3 特殊限制说明
 
-- 当前实现与 `T.atomic_add` 等价（生成相同的 `tl.npuir_atomic_add` TIR），x4 专用硬件语义暂未接入，调用形式保留以兼容既有代码
+- 与 `T.atomic_add` 的等价关系及 x4 语义现状见 1. OP 概述
 
 ### 2.4 使用方法
 
