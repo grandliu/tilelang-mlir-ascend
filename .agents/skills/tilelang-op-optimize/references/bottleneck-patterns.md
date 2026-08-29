@@ -10,7 +10,7 @@
 
 - `BP_launch_overhead`：launch/scheduling overhead 高；包含 host 侧 `BP_launcher_workspace_alloc` 子模式。
 - `BP_per_block_fixed_overhead`：per-block 固定开销地板。
-- `BP_task_concurrency_sweet_spot`：`num_cores` 任务并发存在 U 形甜点区。
+- `BP_task_concurrency_sweet_spot`：`num_cores` / lane 任务并发存在 U 形甜点区。
 - `BP_measurement_resolution_limited`：event 分辨力不足或平区排序不可靠；这是测量质量模式，不代表 kernel 本身瓶颈。
 - `BP_memory_bandwidth_or_mte`：GM/MTE 搬运效率不足。
 - `BP_ub_pressure`：UB/L0 资源压力限制性能。
@@ -19,6 +19,7 @@
 - `BP_block_balance_or_tail`：block 负载不均或 tail 开销。
 - `BP_compute_granularity`：计算粒度或硬件管线使用不足。
 - `BP_redundant_work_or_roundtrip`：重复计算或多余 GM 往返。
+- `BP_low_m_large_n_row_reduce_single_kernel`：低 M × 大 N 行规约的单 kernel 分段并行。
 - `BP_parameter_uncertain`：结构稳定但参数不确定。
 
 新增模式时保持同一结构：
@@ -138,33 +139,38 @@ Host launcher 子模式：`BP_launcher_workspace_alloc`
 - `msprof Task Duration` 不发生不可接受回退。
 - `Block Dim` 降低，`num_cores` 曲线存在合理最优区间。
 
-## BP_task_concurrency_sweet_spot：`num_cores` 任务并发存在 U 形甜点区
+## BP_task_concurrency_sweet_spot：`num_cores` / lane 任务并发存在 U 形甜点区
 
 触发信号：
 
 - 使用 `T.Kernel(num_cores)` + `T.serial(iters_per_core)`，`num_logical` 固定但 `num_cores` 可调。
 - 低 `num_cores` 下每个任务循环次数过多，`Task Duration` 偏高，疑似 DMA/VEC 交替空转。
 - 中间 `num_cores` 区间明显更快，继续增大后 event 或 Task Duration 又变差。
-- 甜点区内 event 差异很小，但 `msprof Task Duration` 或整除性仍能区分候选。
+- 甜点区内 event 差异很小，但 `msprof Task Duration`、整除性、尾随 lane 宽度或 workspace 行数仍能区分候选。
+- 带宽利用率很低，增加 lane 数没有接近线性收益，说明 workload 可能处在时延区而不是吞吐区。
 
 常见反证/不确定点：
 
 - 当前 kernel 计算量足够大，任务并发不足不是主要瓶颈。
 - event 噪声大到无法确认 U 形曲线，需要先匹配 `BP_measurement_resolution_limited`。
-- 最优驻留任务数依赖硬件、CANN、TileLang-NPUIR 和 workload，不能把某个 `num_cores` 固化成通用常数。
+- 最优驻留任务数依赖硬件、CANN、TileLang-NPUIR 和 workload，不能把某个 `num_cores` 或 lane 数固化成通用常数。
+- 带宽利用率已经较高时，可能进入吞吐区，此时优先考虑铺满核、增大访存连续性或提高 pipeline overlap。
 
 推荐动作：
 
 - 计算 `num_logical=ceildiv(N, block_size)`、`iters_per_task=ceildiv(num_logical, num_cores)`、`min/max iters` 和 `imbalance`。
 - 扫 `num_cores` 时覆盖低并发端、`4x/6x/8x AI Core Count` 任务并发锚点、低 imbalance 候选和 flat-grid 端点；只有硬件上下文或 profile 明确给出其它调度核口径时，才使用该口径修正。
-- event 用于识别左端并发不足和右端派发开销；甜点区内若 event 打平，用 `msprof Task Duration` 决胜。
-- 优先选择 event 不明显回退、`msprof` 更低、`imbalance` 更小且 UB/L0 合法的候选。
+- 对低带宽利用率的时延型 workload，不要默认铺满核；优先围绕 `AI Core Count * 1/3` 到 `AI Core Count * 1/2` 构造候选，再向两侧扩展。
+- 若 lane 数是关键参数，不要只扫 2 幂 tile；应按目标 lane 反推 `tile_n` 候选，再检查对齐、整除或 padding、UB/L0 合法性。
+- event 用于识别左端并发不足和右端派发开销；甜点区内若 event 打平，用 `msprof Task Duration`、tail 宽度、workspace 行数和资源余量决胜。
+- 优先选择 event 不明显回退、`msprof` 更低、`imbalance` 更小且 UB/L0 合法的候选；若两个候选在噪声带内打平，选资源估算更稳、改动面更小的配置。
 
 验证指标：
 
 - 低并发端、中间甜点区、过多任务端的曲线形态被记录。
 - winner 的 event 不明显回退，`Task Duration` 在甜点区内更优。
-- `min/max iters` 或整除性解释平区内部差异。
+- `min/max iters`、整除性、尾随 lane 宽度或派发 ramp 能解释平区内部差异。
+- 对小于 5us 或接近噪声带的 kernel，不用单 pass event 做精细排序；配对 A/B、正反序和中位数口径必须记录。
 
 ## BP_measurement_resolution_limited：event 分辨力不足或平区排序不可靠
 
@@ -381,12 +387,46 @@ Host launcher 子模式：`BP_launcher_workspace_alloc`
 - reduce 合并 / single-pass。
 - 公共子表达式复用。
 - streaming / online 递推公式。
+- 对低 M × 大 N 行规约，若结构约束要求保持单 kernel，但行内数据又必须分段处理，可参考 `BP_low_m_large_n_row_reduce_single_kernel`；同时记录最终收敛成本和 UB 压力是否抵消补并行度收益。
 
 验证指标：
 
 - GM 读写次数减少。
 - vector/scalar 操作数减少。
 - `Task Duration` 降低。
+
+## BP_low_m_large_n_row_reduce_single_kernel：低 M × 大 N 行规约的单 kernel 分段并行
+
+触发信号：
+
+- 行规约类算子中 `M` 很小、`N` 很大，按行切分时 `grid_m` 远小于 AI Core Count。
+- 单行数据无法整体放入 UB，但只按行并行会导致大量核闲置。
+- profile 显示带宽利用率低、单 block 固定开销占比高，实际耗时明显高于理论搬运时间。
+- 单 kernel 是硬性结构约束，不能通过拆成多个 kernel 来补并行度或完成收敛。
+
+常见反证/不确定点：
+
+- `M` 已经足够大，按行并行可以自然铺满核。
+- `N` 较小，单行可在 UB 内完成，行内分段会额外引入中间状态、收敛和同步成本。
+- 规约语义不能稳定拆成可合并的分段结果，或者拆分后数值语义难以保持。
+- 单 kernel 内跨 block 收敛会把最终收敛阶段串到后到达 block 的关键路径上；若该代价超过补并行度收益，该模式不成立。
+
+推荐动作：
+
+- 在单个 `T.Kernel` 内将行内 `N` 维拆成多个 chunk，使有效任务数从 `grid_m` 扩展为 `grid_m * num_chunks`。
+- 每个 block 只认领一个或多个 chunk，并在同一次 kernel launch 内完成局部分段计算、状态发布和最终行结果收敛。
+- 中间状态只作为同一 kernel 内的跨 block 协作数据使用，不把它设计成需要第二个 kernel 消费的稳定接口。
+- 对 logsumexp / softmax 类算子，行内分段和最终收敛必须保持 max-shift 语义，避免因拆分改变数值稳定性。
+- workspace 布局优先服务最终收敛阶段的连续读取，同时保证分段写入简单、对齐且不会覆盖其它行。
+
+验证指标：
+
+- baseline 与单 kernel 分段并行方案分别记录 `Task Duration`、NPU event median、正确性和 profile 路径。
+- 记录 `num_chunks / lane_count / tile_n / workspace rows / UB 估算 / 最终收敛宽度`，并解释 winner 为什么胜出。
+- 搜索候选不能只覆盖 2 幂 tile；需要覆盖由目标并行度反推出来的非 2 幂候选。
+- 验证结果与原始行规约数值一致；logsumexp / softmax 类至少检查 max diff 和异常输入。
+- 单 kernel 内的收敛机制应先通过最小 probe 验证，再进入完整算子实现；连续多次 launch 不应发生跨 launch 状态污染。
+- 采纳前做目标 level 全量回归、相关 dtype 复测和其它 dispatch path 非回归。
 
 ## BP_parameter_uncertain：结构稳定但参数不确定
 
