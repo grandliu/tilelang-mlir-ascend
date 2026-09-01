@@ -2613,8 +2613,7 @@ void CodeGenTileLangNPUIRDEV::VpadCodegen(const CallNode *op) {
   mlir::Type dstType = dst.getType();
   auto padOp = builder.create<mlir::hivm::VPadOp>(
       builder.getUnknownLoc(), mlir::TypeRange{dstType}, src, dst, pad_value,
-      low, high,
-      builder.getDenseI64ArrayAttr(npuirop.s_low),
+      low, high, builder.getDenseI64ArrayAttr(npuirop.s_low),
       builder.getDenseI64ArrayAttr(npuirop.s_high));
   mlir::Value result =
       needInsertSlice ? ReshapeCastAndInsertSlice(padOp->getResult(0), dst_ori,
@@ -2630,12 +2629,12 @@ void CodeGenTileLangNPUIRDEV::VflipCodegen(const CallNode *op) {
   Value dst = GenExtractSliceFromRegion(npuirop.dst, npuirop.dst_range);
   bool needInsertSlice = (dst != dst_ori);
   mlir::Type dstType = dst.getType();
-  auto flipOp = builder.create<mlir::hivm::VFlipOp>(
-      builder.getUnknownLoc(), mlir::TypeRange{dstType}, src, dst,
-      npuirop.axis);
+  auto flipOp = builder.create<mlir::hivm::VFlipOp>(builder.getUnknownLoc(),
+                                                    mlir::TypeRange{dstType},
+                                                    src, dst, npuirop.axis);
   mlir::Value result =
-      needInsertSlice ? ReshapeCastAndInsertSlice(flipOp->getResult(0),
-                                                  dst_ori, npuirop.dst_range)
+      needInsertSlice ? ReshapeCastAndInsertSlice(flipOp->getResult(0), dst_ori,
+                                                  npuirop.dst_range)
                       : flipOp->getResult(0);
   SetVarValue(npuirop.dst, result);
 }
