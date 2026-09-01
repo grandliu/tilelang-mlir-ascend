@@ -24,9 +24,9 @@ def vec_gather(block_M, block_N, dtype="float16"):
 
     @T.prim_func
     def sliceGatherDev(
-            A: T.Tensor((block_M, block_N), dtype),
-            B: T.Tensor((block_M, block_N), itype),
-            C: T.Tensor((block_M, block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        B: T.Tensor((block_M, block_N), itype),
+        C: T.Tensor((block_M, block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_shared((block_M, block_N), dtype)
@@ -50,9 +50,9 @@ def vec_gather_partial_dst(block_M, block_N, dtype="float16"):
 
     @T.prim_func
     def sliceGatherPartialDstDev(
-            A: T.Tensor((block_M, block_N), dtype),
-            B: T.Tensor((block_M, block_N), itype),
-            C: T.Tensor((block_M, 2 * block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        B: T.Tensor((block_M, block_N), itype),
+        C: T.Tensor((block_M, 2 * block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_shared((block_M, block_N), dtype)
@@ -63,7 +63,7 @@ def vec_gather_partial_dst(block_M, block_N, dtype="float16"):
             T.copy(C, C_VEC)
             T.npuir_gather(
                 A_VEC[:block_M, :block_N],
-                C_VEC[:block_M, block_N:2 * block_N],
+                C_VEC[:block_M, block_N : 2 * block_N],
                 index_VEC[:block_M, :block_N],
             )
             T.copy(C_VEC, C)
@@ -95,7 +95,7 @@ def test_vec_gather_partial_dst_dev(dtype, M, N):
     B = gen_tensor((M, N), "int32", kind="randint", low=0, high=N)
     C = gen_tensor((M, 2 * N), dtype, kind="zeros")
     ref_C = torch.zeros_like(C.cpu())
-    ref_C[:, N:2 * N] = torch.gather(A.cpu(), dim=-1, index=B.cpu().long())
+    ref_C[:, N : 2 * N] = torch.gather(A.cpu(), dim=-1, index=B.cpu().long())
 
     func = vec_gather_partial_dst(M, N)
     compiled = tilelang.compile(func, target="npuir")

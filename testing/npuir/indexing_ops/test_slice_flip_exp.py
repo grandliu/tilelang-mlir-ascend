@@ -22,8 +22,8 @@ def vec_flip_exp(block_M, block_N, flip_axis, dtype="float16"):
 
     @T.prim_func
     def sliceFlipExp(
-            A: T.Tensor((block_M, block_N), dtype),
-            B: T.Tensor((block_M, block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        B: T.Tensor((block_M, block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_ub((block_M, block_N), dtype)

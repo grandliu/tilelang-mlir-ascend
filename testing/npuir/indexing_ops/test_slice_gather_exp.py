@@ -22,9 +22,9 @@ def vec_gather(block_M, block_N, dtype="float16"):
 
     @T.prim_func
     def sliceGatherKernel(
-            A: T.Tensor((block_M, block_N), dtype),
-            B: T.Tensor((block_M, block_N), itype),
-            C: T.Tensor((block_M, block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        B: T.Tensor((block_M, block_N), itype),
+        C: T.Tensor((block_M, block_N), dtype),
     ):
         with T.Kernel(block_size, is_npu=True) as (cid, _):
             A_VEC = T.alloc_ub((block_M, block_N), dtype)

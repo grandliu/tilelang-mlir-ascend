@@ -22,8 +22,8 @@ def vec_pad(block_M, block_N, dtype="float16"):
 
     @T.prim_func
     def slicePadDev(
-            A: T.Tensor((block_M, block_N), dtype),
-            C: T.Tensor((2 * block_M, block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        C: T.Tensor((2 * block_M, block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_shared((block_M, block_N), dtype)
@@ -47,8 +47,8 @@ def vec_pad_partial_dst(block_M, block_N, dtype="float16"):
 
     @T.prim_func
     def slicePadPartialDstDev(
-            A: T.Tensor((block_M, block_N), dtype),
-            C: T.Tensor((3 * block_M, block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        C: T.Tensor((3 * block_M, block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_shared((block_M, block_N), dtype)
@@ -57,7 +57,7 @@ def vec_pad_partial_dst(block_M, block_N, dtype="float16"):
             T.copy(C, C_VEC)
             T.npuir_pad(
                 A_VEC[:block_M, :block_N],
-                C_VEC[dst_offset_m:dst_offset_m + 2 * block_M, :block_N],
+                C_VEC[dst_offset_m : dst_offset_m + 2 * block_M, :block_N],
                 T.float16(0),
                 [block_M // 2, 0],
                 [block_M // 2, 0],
@@ -89,8 +89,9 @@ def test_vec_pad_partial_dst_dev(dtype):
     A = gen_tensor((M, N), dtype, kind="randn")
     C = gen_tensor((3 * M, N), dtype, kind="zeros")
     ref_C = torch.zeros_like(C.cpu())
-    ref_C[M // 2:M // 2 + 2 * M, :] = torch.nn.functional.pad(
-        A.cpu(), (0, 0, M // 2, M // 2), mode="constant", value=0)
+    ref_C[M // 2 : M // 2 + 2 * M, :] = torch.nn.functional.pad(
+        A.cpu(), (0, 0, M // 2, M // 2), mode="constant", value=0
+    )
 
     func = vec_pad_partial_dst(32, 32)
     compiled = tilelang.compile(func, target="npuir")

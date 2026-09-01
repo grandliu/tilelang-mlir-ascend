@@ -22,9 +22,9 @@ def vec_concat(block_M, block_N, dim, dtype="float16"):
 
     @T.prim_func
     def sliceConcatDev(
-            A: T.Tensor((block_M, block_N), dtype),
-            B: T.Tensor((block_M, block_N), dtype),
-            C: T.Tensor((block_M, 2 * block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        B: T.Tensor((block_M, block_N), dtype),
+        C: T.Tensor((block_M, 2 * block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_shared((block_M, block_N), dtype)
@@ -35,7 +35,7 @@ def vec_concat(block_M, block_N, dim, dtype="float16"):
             T.npuir_concat(
                 A_VEC[:block_M, :block_N],
                 B_VEC[:block_M, :block_N],
-                C_VEC[:block_M, :2 * block_N],
+                C_VEC[:block_M, : 2 * block_N],
                 dim,
             )
             T.copy(C_VEC, C)
@@ -48,9 +48,9 @@ def vec_concat_partial_dst(block_M, block_N, dim, dtype="float16"):
 
     @T.prim_func
     def sliceConcatPartialDstDev(
-            A: T.Tensor((block_M, block_N), dtype),
-            B: T.Tensor((block_M, block_N), dtype),
-            C: T.Tensor((block_M, 3 * block_N), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        B: T.Tensor((block_M, block_N), dtype),
+        C: T.Tensor((block_M, 3 * block_N), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_shared((block_M, block_N), dtype)
@@ -62,7 +62,7 @@ def vec_concat_partial_dst(block_M, block_N, dim, dtype="float16"):
             T.npuir_concat(
                 A_VEC[:block_M, :block_N],
                 B_VEC[:block_M, :block_N],
-                C_VEC[:block_M, block_N:3 * block_N],
+                C_VEC[:block_M, block_N : 3 * block_N],
                 dim,
             )
             T.copy(C_VEC, C)
@@ -94,7 +94,7 @@ def test_vec_concat_partial_dst_dev(dtype):
     B = gen_tensor((M, N), dtype, kind="randn")
     C = gen_tensor((M, 3 * N), dtype, kind="zeros")
     ref_C = torch.zeros_like(C.cpu())
-    ref_C[:, N:3 * N] = torch.cat((A.cpu(), B.cpu()), dim=1)
+    ref_C[:, N : 3 * N] = torch.cat((A.cpu(), B.cpu()), dim=1)
 
     func = vec_concat_partial_dst(32, 32, dim=1)
     compiled = tilelang.compile(func, target="npuir")

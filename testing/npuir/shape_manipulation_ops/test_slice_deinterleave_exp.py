@@ -23,9 +23,9 @@ def vec_deinterleave(block_M, block_N, channel_nums, dtype="float16"):
 
     @T.prim_func
     def sliceDeinterleaveExp(
-            A: T.Tensor((block_M, block_N), dtype),
-            O0: T.Tensor((block_M, block_N_half), dtype),
-            O1: T.Tensor((block_M, block_N_half), dtype),
+        A: T.Tensor((block_M, block_N), dtype),
+        O0: T.Tensor((block_M, block_N_half), dtype),
+        O1: T.Tensor((block_M, block_N_half), dtype),
     ):
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
             A_VEC = T.alloc_ub((block_M, block_N), dtype)
