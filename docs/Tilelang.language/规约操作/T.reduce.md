@@ -15,14 +15,14 @@ T.reduce_sum(src, dst, dims=0, clear = False)
 
 ### 2.1 参数说明
 
-| 参数名        | 类型         | 说明                                                    |
-| ------------- | ------------ | ------------------------------------------------------- |
-| `src`         | `tensor`     | 输入tensor                                              |
-| `dst`         | `tensor`     | 输出tensor                                              |
-| `dims`        | `list/tuple` | 需要reduce的维度                                        |
-| `reduce_mode` | `str`        | reduce操作类型(`sum`、`max`、`min`、`abssum`、`absmax`) |
+| 参数名          | 类型           | 说明                                                                                |
+| --------------- | -------------- | ----------------------------------------------------------------------------------- |
+| `src`         | `tensor`     | 输入tensor                                                                          |
+| `dst`         | `tensor`     | 输出tensor                                                                          |
+| `dims`        | `list/tuple` | 需要reduce的维度                                                                    |
+| `reduce_mode` | `str`        | reduce操作类型(`sum`、`max`、`min`、`abssum`、`absmax`)                   |
 | `clear`       | `bool`       | 是否在reduce前对目标张量进行初始化（`clear=False` 的使用约束见 2.3 特殊限制说明） |
-| `size`        | `list`       | 控制 reduce 实际参与计算的数据范围                      |
+| `size`        | `list`       | 控制 reduce 实际参与计算的数据范围                                                  |
 
 ### 2.2 支持规格
 
@@ -30,7 +30,7 @@ T.reduce_sum(src, dst, dims=0, clear = False)
 
 |        | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | fp16 | fp32 | bf16 | bool/int1 |
 | ------ | ----- | ---- | ------ | ----- | ------ | ----- | ------ | ----- | ---- | ---- | ---- | --------- |
-| Ascend | √    | √   | √     | √    | √     | √    | √     | √    | √   | √   | ×   | ×        |
+| Ascend | ×    | ×   | √     | √    | √     | √    | √     | √    | √   | √   | ×   | ×        |
 
 #### 2.2.2 Shape支持
 
