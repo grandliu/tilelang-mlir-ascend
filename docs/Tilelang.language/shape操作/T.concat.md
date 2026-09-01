@@ -30,7 +30,7 @@ T.concat(src_1, src_2, ..., src_N, dst, concat_dim)
 
 ### 2.3 特殊限制说明
 
-- concat 仅支持 Expert 模式（`TILELANG_ASCEND_MODE=expert` 或不设置）；Developer 模式下编译失败（`'hivm.hir.vconcat' op expected the number of tensor results (0) to be equal to the number of output tensors (1)`）
+- 无
 
 ### 2.4 使用方法
 
@@ -54,9 +54,9 @@ def concat(M, N, block_M, block_N, dtype="float16"):
             bx = bx_ * block_M
             by_ = cid % n_num
             by = by_ * block_N
-            A_VEC = T.alloc_ub((block_M, block_N), dtype)
-            B_VEC = T.alloc_ub((block_M, block_N), dtype)
-            C_VEC = T.alloc_ub((block_M, 2 * block_N), dtype)
+            A_VEC = T.alloc_shared((block_M, block_N), dtype)
+            B_VEC = T.alloc_shared((block_M, block_N), dtype)
+            C_VEC = T.alloc_shared((block_M, 2 * block_N), dtype)
             for i in T.serial(T.ceildiv(m_num * n_num, BLOCK_SIZE)):
                 block_id_base = i * BLOCK_SIZE
                 block_id = block_id_base + cid

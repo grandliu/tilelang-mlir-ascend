@@ -36,7 +36,6 @@ T.interleave(src1, src2, ..., dst, channel_nums=2, size=[])
 - 由于硬件限制，目前仅支持两个tensor的交错操作
 - 输入tensor的shape必须相同
 - 输出tensor的shape会根据输入tensor的shape和channel_nums自动计算
-- interleave仅支持Expert模式使用
 
 ### 2.4 使用方法
 
@@ -55,9 +54,9 @@ def vinterleave_kernel(M, N, dtype):
     ):
 
         with T.Kernel(BLOCK_SIZE, is_npu=True) as (cid, _):
-            A_ub = T.alloc_ub((M, N), dtype)
-            B_ub = T.alloc_ub((M, N), dtype)
-            C_ub = T.alloc_ub((M, N * 2), dtype)
+            A_ub = T.alloc_shared((M, N), dtype)
+            B_ub = T.alloc_shared((M, N), dtype)
+            C_ub = T.alloc_shared((M, N * 2), dtype)
 
             T.copy(A, A_ub)
             T.copy(B, B_ub)

@@ -40,7 +40,7 @@ T.deinterleave(src, *dsts, channel_nums=2, index_mode="ALL_CHANNELS", size=[])
 
 ### 2.3 特殊限制说明
 
-- deinterleave 仅支持 Expert 模式（`TILELANG_ASCEND_MODE=expert` 或不设置）；Developer 模式下编译失败（`'hivm.hir.vdeinterleave' op expected the number of tensor results (0) to be equal to the number of output tensors (1)`）
+- 无
 
 ### 2.4 使用方法
 
@@ -62,9 +62,9 @@ def deinterleave_c2(M, N, block_M, dtype="float16"):
         with T.Kernel(m_num, is_npu=True) as (cid, _):
             offset = cid * block_M
 
-            ub_input = T.alloc_ub((block_M, N), dtype)
-            ub_output0 = T.alloc_ub((block_M, N_half), dtype)
-            ub_output1 = T.alloc_ub((block_M, N_half), dtype)
+            ub_input = T.alloc_shared((block_M, N), dtype)
+            ub_output0 = T.alloc_shared((block_M, N_half), dtype)
+            ub_output1 = T.alloc_shared((block_M, N_half), dtype)
 
             T.copy(Input[offset : offset + block_M, :], ub_input)
             T.deinterleave(ub_input, ub_output0, ub_output1, channel_nums=2)

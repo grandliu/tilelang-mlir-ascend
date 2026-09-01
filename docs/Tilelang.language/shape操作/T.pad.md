@@ -35,7 +35,6 @@ T.pad(src, dst, pad_value, low, high, size)
 
 ### 2.3 特殊限制说明
 
-- pad 仅支持 Expert 模式（`TILELANG_ASCEND_MODE=expert` 或不设置）；Developer 模式下编译失败（`'hivm.hir.vpad' op expected the number of tensor results (0) to be equal to the number of output tensors (1)`）
 - `pad_value` 必须是类型化常量（如 `T.float16(0)`），且类型与数据 dtype 一致；Python 字面量 `0.0` 会编译失败（`'hivm.hir.vbrc' op requires the same element type for all operands`）
 
 ### 2.4 使用方法
@@ -59,9 +58,9 @@ def main(
         by_ = cid % n_num
         by = by_ * block_N
 
-        A_VEC = T.alloc_ub((block_M, block_N), src_dtype)
-        B_VEC = T.alloc_ub((2 * block_M, block_N), dst_dtype)
-        C_VEC = T.alloc_ub((block_M + 2 * m_num * n_num, block_N), dst_dtype)
+        A_VEC = T.alloc_shared((block_M, block_N), src_dtype)
+        B_VEC = T.alloc_shared((2 * block_M, block_N), dst_dtype)
+        C_VEC = T.alloc_shared((block_M + 2 * m_num * n_num, block_N), dst_dtype)
 
         T.copy(A[bx, by], A_VEC)
 
