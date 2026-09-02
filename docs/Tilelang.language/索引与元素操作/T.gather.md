@@ -29,7 +29,7 @@ T.gather(src, dst, indices,[m,n])
 
 ### 2.3 特殊限制说明
 
-- gather 当前按最后一维取数，不提供额外的 `dim` 参数。
+gather 当前按最后一维取数，不提供额外的 `dim` 参数。
 
 ### 2.4 使用方法
 

@@ -33,7 +33,7 @@ T.reduce_sum(buffer, out, dim=-1, clear=True)
 
 ### 2.3 特殊限制说明
 
-- dim参数必须在输入tensor的维度范围内
+dim参数必须在输入tensor的维度范围内
 
 ### 2.4 使用方法
 

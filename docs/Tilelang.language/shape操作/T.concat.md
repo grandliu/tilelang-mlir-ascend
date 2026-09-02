@@ -30,8 +30,6 @@ T.concat(src_1, src_2, ..., src_N, dst, concat_dim)
 
 ### 2.3 特殊限制说明
 
-- 无
-
 ### 2.4 使用方法
 
 以下示例展示了concat的使用，在第1维进行拼接：

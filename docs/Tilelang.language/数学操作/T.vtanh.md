@@ -60,5 +60,5 @@ def vec_tanh(M, N, dtype):
 
 **tilelang::vtanhOp**的转换按模式分派：
 
-- Developer 模式：`arith::ConstantOp`、`hivm::VExpOp`、`hivm::VSubOp`、`hivm::VAddOp`、`hivm::VMulOp`、`hivm::VDivOp`（`tanh(x) = (exp(2x)-1)/(exp(2x)+1)`）
-- Expert 模式：`arith::ConstantOp`、`hivm::VMulOp`、`hivm::VAddOp`（多项式逼近）
+Developer 模式：`arith::ConstantOp`、`hivm::VExpOp`、`hivm::VSubOp`、`hivm::VAddOp`、`hivm::VMulOp`、`hivm::VDivOp`（`tanh(x) = (exp(2x)-1)/(exp(2x)+1)`）
+Expert 模式：`arith::ConstantOp`、`hivm::VMulOp`、`hivm::VAddOp`（多项式逼近）

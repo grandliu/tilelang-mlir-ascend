@@ -46,7 +46,7 @@ T.reduce_sum(src, dst, dims=0, clear = False)
 
 ### 2.3 特殊限制说明
 
-- `clear=False` 表示在 dst 现有值上累加，调用方必须先初始化 dst（例如先用 `T.reduce_abssum` 等写入初始值）；对未初始化 buffer 使用 `clear=False` 不会报错，但会产生静默数值错误
+`clear=False` 表示在 dst 现有值上累加，调用方必须先初始化 dst（例如先用 `T.reduce_abssum` 等写入初始值）；对未初始化 buffer 使用 `clear=False` 不会报错，但会产生静默数值错误
 
 ### 2.4 使用方法
 

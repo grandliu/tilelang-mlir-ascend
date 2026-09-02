@@ -32,7 +32,7 @@ T.atomic_addx4(dst, src, size=[])
 
 ### 2.3 特殊限制说明
 
-- 与 `T.atomic_add` 的等价关系及 x4 语义现状见 1. OP 概述
+与 `T.atomic_add` 的等价关系及 x4 语义现状见 1. OP 概述
 
 ### 2.4 使用方法
 

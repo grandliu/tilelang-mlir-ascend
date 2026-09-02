@@ -29,9 +29,9 @@ T.vclamp(src, dst, min_val, max_val)
 
 #### 2.2.2 Shape支持
 
-- `src` 与 `dst` 必须同 shape（逐元素裁剪）
-- 当 `min_val` / `max_val` 是 Buffer 时，需与 `src/dst` 可逐元素对应（通常同 shape）
-- 当 `min_val` / `max_val` 是标量时，按标量广播到全部元素
+`src` 与 `dst` 必须同 shape（逐元素裁剪）
+当 `min_val` / `max_val` 是 Buffer 时，需与 `src/dst` 可逐元素对应（通常同 shape）
+当 `min_val` / `max_val` 是标量时，按标量广播到全部元素
 
 ### 2.3 特殊限制说明
 
@@ -106,5 +106,5 @@ def vclamp_tensor_kernel(M, N, dtype="float16"):
 
 在 MLIR codegen 阶段（`src/target/codegen_npuir_api.cc` / `src/target/codegen_npuir_dev.cc`）对应为：
 
-- `tl.npuir_max` -> `mlir::hivm::VMaxOp`
-- `tl.npuir_min` -> `mlir::hivm::VMinOp`
+`tl.npuir_max` -> `mlir::hivm::VMaxOp`
+`tl.npuir_min` -> `mlir::hivm::VMinOp`

@@ -27,24 +27,24 @@ T.Kernel(blocks, threads, is_cpu, prelude, is_npu, pipeline)
 
 **T.Kernel 本身不约束张量或标量的数据类型**。
 
-- 只定义「网格/块/线程」的维度和索引变量（`tir.Var`），数据类型由内核体内的 `T.alloc_shared`、`T.alloc_ub`、缓冲区声明以及具体计算决定。
-- 索引变量的 dtype 由 TIR 的迭代/变量约定决定（一般为整型 `int32`）。
+只定义「网格/块/线程」的维度和索引变量（`tir.Var`），数据类型由内核体内的 `T.alloc_shared`、`T.alloc_ub`、缓冲区声明以及具体计算决定。
+索引变量的 dtype 由 TIR 的迭代/变量约定决定（一般为整型 `int32`）。
 
 #### 2.2.2 Shape支持
 
 **blocks（网格维度）**
 
-- 维度数：**1～3**
-- 每维为 `tir.PrimExpr`（常量或符号，如 `T.ceildiv(M, block_M)`）
-- 语义：第 1 维对应 `blockIdx.x`，第 2 维对应 `blockIdx.y`，第 3 维对应 `blockIdx.z`；未显式给出的维度视为 1（由 `KernelLaunch` 内扩展）。
+维度数：**1～3**
+每维为 `tir.PrimExpr`（常量或符号，如 `T.ceildiv(M, block_M)`）
+语义：第 1 维对应 `blockIdx.x`，第 2 维对应 `blockIdx.y`，第 3 维对应 `blockIdx.z`；未显式给出的维度视为 1（由 `KernelLaunch` 内扩展）。
 
 ### 2.3 特殊限制说明
 
 **NPU 模式（`is_npu=True`）**
 
-- **最多支持 2 个 block 维度**（`len(blocks) <= 2`）；超过 2 维会触发 `AssertionError: "NPU kernel only supports up to 2D blocks"`。2D grid 完全合法（官方测试 `testing/npuir/test_2d_grid_dev.py`）。
-- 2D grid 的解包方式为 `with T.Kernel(n0, n1, is_npu=True) as (bx, by, _):`。
-- 进入上下文时返回的是前 2 个 iter_var 的变量（`frames[0].iter_var.var`, `frames[1].iter_var.var`），用于 NPU 的 cube/vector 索引（`cid, vid`）。
+**最多支持 2 个 block 维度**（`len(blocks) <= 2`）；超过 2 维会触发 `AssertionError: "NPU kernel only supports up to 2D blocks"`。2D grid 完全合法（官方测试 `testing/npuir/test_2d_grid_dev.py`）。
+2D grid 的解包方式为 `with T.Kernel(n0, n1, is_npu=True) as (bx, by, _):`。
+进入上下文时返回的是前 2 个 iter_var 的变量（`frames[0].iter_var.var`, `frames[1].iter_var.var`），用于 NPU 的 cube/vector 索引（`cid, vid`）。
 
 ### 2.4 使用方法
 

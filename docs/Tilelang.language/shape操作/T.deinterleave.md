@@ -22,9 +22,9 @@ T.deinterleave(src, *dsts, channel_nums=2, index_mode="ALL_CHANNELS", size=[])
 
 约束：
 
-- `src` 和 `*dsts` 应具有相同的数据类型
-- `src` 的最后一维必须能被 `channel_nums` 整除
-- `index_mode` 参数候选列表如下： `"CHANNEL_0", "CHANNEL_1", "ALL_CHANNELS"`
+`src` 和 `*dsts` 应具有相同的数据类型
+`src` 的最后一维必须能被 `channel_nums` 整除
+`index_mode` 参数候选列表如下： `"CHANNEL_0", "CHANNEL_1", "ALL_CHANNELS"`
 
 ### 2.2 OP 规格
 
@@ -39,8 +39,6 @@ T.deinterleave(src, *dsts, channel_nums=2, index_mode="ALL_CHANNELS", size=[])
 仅支持 1-5D tensor
 
 ### 2.3 特殊限制说明
-
-- 无
 
 ### 2.4 使用方法
 

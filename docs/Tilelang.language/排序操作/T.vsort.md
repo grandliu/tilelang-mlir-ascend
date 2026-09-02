@@ -113,5 +113,5 @@ hivm.hir.vsort ins(%src : memref<...>) outs(%dst_value, %dst_index : memref<...>
 
 ## 4. 兼容性
 
-- `T.npuir_sort` 为兼容别名，与 `T.vsort` 完全等价。
-- 遵循 v 前缀 API 规范，新代码推荐使用 `T.vsort`。
+`T.npuir_sort` 为兼容别名，与 `T.vsort` 完全等价。
+遵循 v 前缀 API 规范，新代码推荐使用 `T.vsort`。

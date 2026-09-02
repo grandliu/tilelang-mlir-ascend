@@ -45,7 +45,7 @@ T.vbrc(src, dst)
 
 ### 2.3 特殊限制说明
 
-- 底层 VBrcOp 对 i1（bool）类型要求 dst 尾轴按 16 对齐，否则存在越界风险；且 bool 无法 load/store GM，仅可作为片上中间结果使用
+底层 VBrcOp 对 i1（bool）类型要求 dst 尾轴按 16 对齐，否则存在越界风险；且 bool 无法 load/store GM，仅可作为片上中间结果使用
 
 ### 2.4 使用方法
 

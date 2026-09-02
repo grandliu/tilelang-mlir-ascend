@@ -35,7 +35,7 @@ T.pad(src, dst, pad_value, low, high, size)
 
 ### 2.3 特殊限制说明
 
-- `pad_value` 必须是类型化常量（如 `T.float16(0)`），且类型与数据 dtype 一致；Python 字面量 `0.0` 会编译失败（`'hivm.hir.vbrc' op requires the same element type for all operands`）
+`pad_value` 必须是类型化常量（如 `T.float16(0)`），且类型与数据 dtype 一致；Python 字面量 `0.0` 会编译失败（`'hivm.hir.vbrc' op requires the same element type for all operands`）
 
 ### 2.4 使用方法
 
