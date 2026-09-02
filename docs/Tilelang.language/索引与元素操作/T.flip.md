@@ -30,6 +30,8 @@ T.flip(src, dst, axis: int)
 
 ### 2.4 特殊限制说明
 
+无
+
 ### 2.5 使用方法
 
 ```python

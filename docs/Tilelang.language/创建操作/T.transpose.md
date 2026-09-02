@@ -33,8 +33,8 @@ T.transpose(src, dst, permutation, size=[])
 
 ### 2.3 特殊限制说明
 
-`T.transpose` 底层调用 `hivm.hir.vtranspose`，而 `hivm.hir.vtranspose` 当前只支持转置两个轴，因此 `T.transpose` 也只支持转置两个轴，即 `permutation` 只能是交换两个轴、其余轴保持原位的排列。
-如果需要转置两个轴以上，可以分解为几次相邻轴交换的链。例如将 `(A, B, C)` 转置为 `(C, A, B)`（等价于 `permutation=[2, 0, 1]`），可分解为两次相邻轴交换：
+- `T.transpose` 底层调用 `hivm.hir.vtranspose`，而 `hivm.hir.vtranspose` 当前只支持转置两个轴，因此 `T.transpose` 也只支持转置两个轴，即 `permutation` 只能是交换两个轴、其余轴保持原位的排列。
+- 如果需要转置两个轴以上，可以分解为几次相邻轴交换的链。例如将 `(A, B, C)` 转置为 `(C, A, B)`（等价于 `permutation=[2, 0, 1]`），可分解为两次相邻轴交换：
 
 ```
 (A, B, C) --[0, 2, 1]--> (A, C, B) --[1, 0, 2]--> (C, A, B)

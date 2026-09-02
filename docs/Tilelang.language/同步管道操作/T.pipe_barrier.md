@@ -32,9 +32,9 @@ PIPE_S、PIPE_V、PIPE_M、PIPE_MTE1、PIPE_MTE2、PIPE_MTE3、PIPE_ALL、PIPE_M
 
 ### 2.3 特殊限制说明
 
-pipe参数必须是有效的字符串标识符
-该操作用于同步管道级别的操作，确保管道中的操作按预期顺序执行
-通常与set_flag、wait_flag等同步操作配合使用
+- pipe参数必须是有效的字符串标识符
+- 该操作用于同步管道级别的操作，确保管道中的操作按预期顺序执行
+- 通常与set_flag、wait_flag等同步操作配合使用
 
 ### 2.4 使用方法
 

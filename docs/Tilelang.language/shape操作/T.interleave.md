@@ -33,9 +33,9 @@ T.interleave(src1, src2, ..., dst, channel_nums=2, size=[])
 
 ### 2.3 特殊限制说明
 
-由于硬件限制，目前仅支持两个tensor的交错操作
-输入tensor的shape必须相同
-输出tensor的shape会根据输入tensor的shape和channel_nums自动计算
+- 由于硬件限制，目前仅支持两个tensor的交错操作
+- 输入tensor的shape必须相同
+- 输出tensor的shape会根据输入tensor的shape和channel_nums自动计算
 
 ### 2.4 使用方法
 
