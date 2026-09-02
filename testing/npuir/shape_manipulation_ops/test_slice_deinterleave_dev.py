@@ -43,6 +43,7 @@ def vec_deinterleave(block_M, block_N, channel_nums, dtype="float16"):
 
     return sliceDeinterleaveDev
 
+
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_vec_deinterleave_dev(dtype):
     M, N = 32, 32
