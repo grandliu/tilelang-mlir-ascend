@@ -8,6 +8,7 @@ from pathlib import Path
 
 from tileops.reporting.report import write_reports
 from tileops.reporting.runner import list_operators, run_operator
+from tileops.reporting.stage_timing import load_stage_timing
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -34,6 +35,14 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--reports-dir", default="reports/tileops")
     run.add_argument("--timeout", type=int, help="timeout in seconds for each pytest stage")
     run.add_argument(
+        "--stage-timing", choices=("off", "workflow"), default="off",
+        help="include workflow Stage durations in the report (default: off)",
+    )
+    run.add_argument(
+        "--timing-source", action="append", default=[],
+        help="workflow operator/function directory or .task_timeline.jsonl; repeat for each source",
+    )
+    run.add_argument(
         "--pytest-arg",
         action="append",
         default=[],
@@ -43,6 +52,11 @@ def _parser() -> argparse.ArgumentParser:
     render = subparsers.add_parser("render", help="regenerate Markdown/HTML from run.json")
     render.add_argument("run_json")
     render.add_argument("--output-dir")
+    render.add_argument(
+        "--stage-timing", choices=("off", "workflow"),
+        help="override saved stage timing; omitted preserves run.json",
+    )
+    render.add_argument("--timing-source", action="append", default=[])
     return parser
 
 
@@ -59,6 +73,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render":
         source = Path(args.run_json).resolve()
         run = json.loads(source.read_text(encoding="utf-8"))
+        if args.stage_timing == "off":
+            run.pop("stage_timing", None)
+        elif args.stage_timing == "workflow":
+            run["stage_timing"] = load_stage_timing(args.timing_source)
         output = Path(args.output_dir).resolve() if args.output_dir else source.parent
         paths = write_reports(run, output)
         print(f"Reports written to {paths['markdown']} and {paths['html']}")
@@ -74,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         reports_dir=args.reports_dir,
         pytest_args=args.pytest_arg,
         timeout=args.timeout,
+        stage_timing=args.stage_timing,
+        timing_sources=args.timing_source,
     )
     print(f"[tileops-report] status={run['status']} report={run_dir / 'report.md'}")
     return exit_code

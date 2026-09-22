@@ -233,12 +233,78 @@ def _setup_tables_markdown(run: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _stage_timing_markdown(run: dict[str, Any]) -> list[str]:
+    timing = run.get("stage_timing")
+    if not timing:
+        return []
+    lines = ["## Workflow Stage Timing / 流程阶段耗时", "",
+             "单位：秒；总耗时仅累计有 duration_s 的完成或失败尝试。", "",
+             "| Stage | Total (s) | Attempts |", "|---|---:|---:|"]
+    for row in timing.get("stages", []):
+        stage = row["stage"]
+        lines.append(
+            f"| [Stage {stage} — {_md_cell(row['name'])}](#stage-timing-{stage}) | "
+            f"{_fmt(row.get('duration_s_total'), 3)} | {row.get('attempt_count', 0)} |"
+        )
+    lines.append("")
+    for row in timing.get("stages", []):
+        stage = row["stage"]
+        lines.extend([
+            f'<a id="stage-timing-{stage}"></a>',
+            f"### Stage {stage} — {row['name']}", "",
+            "| Scope | Attempt | Result | Duration (s) | Verdict |",
+            "|---|---:|---|---:|---|",
+        ])
+        for index, attempt in enumerate(row.get("attempts", []), 1):
+            lines.append(
+                f"| {_md_cell(attempt.get('scope') or '-')} | {index} | "
+                f"{_md_cell(attempt.get('outcome') or '-')} | "
+                f"{_fmt(attempt.get('duration_s'), 3)} | "
+                f"{_md_cell(attempt.get('verdict') or '-')} |"
+            )
+        lines.append("")
+    return lines
+
+
+def _stage_timing_html(run: dict[str, Any]) -> str:
+    timing = run.get("stage_timing")
+    if not timing:
+        return ""
+    blocks = []
+    for row in timing.get("stages", []):
+        attempts = "".join(
+            "<tr>"
+            f"<td>{html.escape(str(attempt.get('scope') or '-'))}</td>"
+            f"<td>{index}</td>"
+            f"<td>{html.escape(str(attempt.get('outcome') or '-'))}</td>"
+            f"<td>{_fmt(attempt.get('duration_s'), 3)}</td>"
+            f"<td>{html.escape(str(attempt.get('verdict') or '-'))}</td>"
+            "</tr>"
+            for index, attempt in enumerate(row.get("attempts", []), 1)
+        )
+        blocks.append(
+            f'<details class="stage-timing" id="stage-timing-{row["stage"]}">'
+            f'<summary>Stage {row["stage"]} — {html.escape(str(row["name"]))}'
+            f' <strong>{_fmt(row.get("duration_s_total"), 3)} s</strong>'
+            f' · {row.get("attempt_count", 0)} attempts</summary>'
+            '<div class="table-wrap"><table><thead><tr><th>Scope</th><th>Attempt</th>'
+            '<th>Result</th><th>Duration (s)</th><th>Verdict</th></tr></thead>'
+            f'<tbody>{attempts}</tbody></table></div></details>'
+        )
+    return (
+        '<section class="section"><h3>Workflow Stage Timing / 流程阶段耗时</h3>'
+        '<p class="note">单位：秒；总耗时仅累计有 duration_s 的完成或失败尝试。</p>'
+        f'{"".join(blocks)}</section>'
+    )
+
+
 def render_markdown(run: dict[str, Any]) -> str:
     """Render the CANN-Bench-style hierarchy in Markdown."""
     run = _normalize_run_for_render(run)
     summary = run.get("summary") or {}
     lines = [f"# TileOPs Evaluation Report: {run.get('operator', 'unknown')}", ""]
     lines.extend(_setup_tables_markdown(run))
+    lines.extend(_stage_timing_markdown(run))
     lines.extend(
         [
             "## Results Overview / 结果总览",
@@ -560,6 +626,7 @@ def render_html(run: dict[str, Any]) -> str:
         "{{OPERATOR_ANALYSIS_ROWS}}": _operator_analysis_rows(run),
         "{{OPERATOR_DETAILS_SECTION}}": _operator_details_section(run),
         "{{DIAGNOSTICS_SECTION}}": _alert_section(run),
+        "{{STAGE_TIMING_SECTION}}": _stage_timing_html(run),
     }
     for token, value in replacements.items():
         template = template.replace(token, value)

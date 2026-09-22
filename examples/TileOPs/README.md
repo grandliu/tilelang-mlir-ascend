@@ -99,6 +99,28 @@ without rerunning NPU tests:
 tileops-report render reports/tileops/<run-id>/run.json
 ```
 
+Workflow Stage timing is optional and off by default. For a conductor task,
+pass each directory containing a statectl `.task_timeline.jsonl` file (one
+operator directory plus any per-function directories):
+
+```bash
+tileops-report run --op MishFwdOp --prof-mode msprof \
+  --stage-timing workflow --timing-source ../mish \
+  --timing-source ../mish/function_name
+```
+
+The reports then show total duration for each workflow Stage and expandable
+per-attempt durations. These are process elapsed times in seconds, distinct
+from kernel latency in microseconds. A Stage still running when `run` finishes
+has no final duration yet. After the conductor completes that Stage, refresh
+the same report without rerunning tests:
+
+```bash
+tileops-report render reports/tileops/<run-id>/run.json \
+  --stage-timing workflow --timing-source ../mish \
+  --timing-source ../mish/function_name
+```
+
 Report runs must be serial.  Do not pass pytest-xdist ``-n`` or
 ``--numprocesses`` options: benchmark records are process-local and cannot yet be
 merged safely across workers.  The CLI rejects these options instead of producing an

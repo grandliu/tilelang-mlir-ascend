@@ -18,6 +18,7 @@ from tileops.reporting.analyzer import analyze_run
 from tileops.reporting.collector import load_benchmark_report, parse_junit_report
 from tileops.reporting.report import write_reports
 from tileops.reporting.setup_info import collect_setup_info
+from tileops.reporting.stage_timing import load_stage_timing
 
 
 def project_root() -> Path:
@@ -159,9 +160,19 @@ def run_operator(
     pytest_args: list[str] | None = None,
     timeout: int | None = None,
     root: str | Path | None = None,
+    stage_timing: str = "off",
+    timing_sources: list[str | Path] | None = None,
 ) -> tuple[dict[str, Any], Path, int]:
     """Run correctness then benchmark, and emit one self-contained report directory."""
     repo_root = Path(root).resolve() if root else project_root()
+    if stage_timing not in {"off", "workflow"}:
+        raise ValueError("stage_timing must be off or workflow")
+    # Resolve before running tests so a missing source does not waste a test run.
+    resolved_timing_sources = [
+        (repo_root / source).resolve() for source in (timing_sources or [])
+    ]
+    if stage_timing == "workflow":
+        load_stage_timing(resolved_timing_sources)
     resolved_test, resolved_benchmark = resolve_operator(
         operator, test_file=test_file, benchmark_file=benchmark_file
     )
@@ -282,6 +293,8 @@ def run_operator(
         setup=setup,
         operator_catalog=operator_catalog,
     )
+    if stage_timing == "workflow":
+        run["stage_timing"] = load_stage_timing(resolved_timing_sources)
     write_reports(run, run_dir)
 
     # Keep a compact machine-readable pointer for simple automation.

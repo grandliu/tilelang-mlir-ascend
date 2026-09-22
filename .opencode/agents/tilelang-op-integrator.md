@@ -71,11 +71,14 @@ python .agents/skills/add-npu-op/scripts/integrate_kernel.py --meta <meta_path>
 工作目录保持为第一步进入的 `examples/TileOPs/`（从仓库根目录运行时先 `cd examples/TileOPs`）：
 
 ```bash
-python -m tileops.reporting.cli run --op {op_name} --prof-mode msprof
+python -m tileops.reporting.cli run --op {op_name} --prof-mode msprof \
+  --stage-timing workflow --timing-source ../{op_slug} \
+  --timing-source ../{op_slug}/{func_1}  # 每个提取函数再传一次 --timing-source
 ```
 
 - 不得从仓库根目录直接运行模块命令。
 - `{op_name}` 使用 `.migration_meta.json` 的 PascalCase manifest 键，不使用 `op_slug`；确认 manifest 的 `source.test/source.bench` 与元数据中的 test/bench 路径一致。只运行该算子，不使用 `--all`。
+- 复盘报告显式启用 `--stage-timing workflow`；`--timing-source` 包括 op 级目录和 `.migration_meta.json` 中每个提取函数的目录（按函数重复传参）。普通用户直接运行 TileOPs 全量测试时不传该开关，默认关闭。此时 Stage 5 还在运行，完整 Stage 5 耗时由 conductor 在 `complete_stage(5)` 后刷新报告。
 - report 自动运行该算子的全量正确性测试；正确性通过才运行 benchmark。无需再单独执行全量 pytest 或 benchmark。smoke 可用于失败定位，但不是独立的 Stage 5 完成门禁；最终结论必须来自重新运行的完整 report。
 - 每次运行都保留时间戳报告目录。根据命令输出的 `report.md` 精确定位同目录 `run.json`；不得仅引用可能被下一次运行覆盖的 `latest.json`。
 - 在集成包写 `integration_report.json`，格式为 `{"run_json": "examples/TileOPs/reports/tileops/<本次运行目录>/run.json"}`（仓库相对路径，正斜杠）。`integration_log.md` 同时记录本次 `run.json`、`report.md` 路径及结果；性能数字从 `run.json` 摘要引用，不另造数据。

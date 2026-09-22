@@ -67,10 +67,10 @@ harness 迁移**不询问调优、不进入 Stage 4**（bench 由 Stage 5 仅报
 - **触发条件**：全部提取函数 Stage 3 通过且二次校验完成（`.migration_state.json` 的 `functions` 全部 `done`）
 - **输入**：`meta_path`、`op_name`、`op_slug`、`family`、`attempt_index`、`max_attempts`（默认 5）
 - **输出/交付件**：`tileops/kernels/{family}/{op_slug}/{op_slug}_kernel/`（集成 kernel 文件 + 每函数 `{func}_DESIGN.md` 设计文档快照（源自 `examples/{op_slug}/{func}/DESIGN.md`）+ 聚合 `__init__.py` + `integration_log.md` + `integration_report.json`），wrapper import 已改写为 baseline/perf_opt 双 import 切换块（baseline 默认激活，perf_opt 注释占位）；另有本次单算子 TileOPs `run.json`、`report.md`、`report.html`
-- **完成信号**：三态之一：`INTEGRATE_COMPLETED`（从 `examples/TileOPs/` 运行 `python -m tileops.reporting.cli run --op {op_name} --prof-mode msprof`；本次 report 全量正确性通过、benchmark 已运行并报告；report 为 `partial` 时明确披露 benchmark 失败/无效但不阻断集成）/ `[INTEGRATE_FAIL]` / `[DESIGN_ERROR]`
+- **完成信号**：三态之一：`INTEGRATE_COMPLETED`（从 `examples/TileOPs/` 按 `tilelang-op-integrator.md` 的命令运行单算子 report，开启 `--stage-timing workflow` 并传入 op 级及各函数时间线；本次 report 全量正确性通过、benchmark 已运行并报告；report 为 `partial` 时明确披露 benchmark 失败/无效但不阻断集成）/ `[INTEGRATE_FAIL]` / `[DESIGN_ERROR]`
 - **编排层动作**：
-  - `INTEGRATE_COMPLETED` → `complete_stage(5)` → `phase=DONE`（harness 迁移不询问调优；最终报告附本次 report 路径、bench 状态与有效数值，以及"可另起 optimize 场景"提示）
-  - `[INTEGRATE_FAIL]` → `fail_stage(5)` → 重新调度 integrator 传入 `last_failure_summary`（`stage_retry_count[5]` 上限 2；integrator 内部已有 5 次调试闭环，两级预算独立）；超限 → `phase=FAILED`、`failure_reason=BLOCKED_INTEGRATION`
+  - `INTEGRATE_COMPLETED` → `complete_stage(5)` → `phase=DONE`。随后从 `examples/TileOPs/` 对 `integration_report.json` 指向的本次 `run.json` 执行 `python -m tileops.reporting.cli render <run.json> --stage-timing workflow --timing-source ../{op_slug}`，并为 `.migration_meta.json` 中每个提取函数重复传 `--timing-source ../{op_slug}/{func}`，刷新同目录 `report.md` / `report.html` 和 `run.json` 中的完整 Stage 5 耗时（不重跑测试）；最终报告附本次 report 路径、bench 状态与有效数值，以及"可另起 optimize 场景"提示。
+  - `[INTEGRATE_FAIL]` → `fail_stage(5)`；若本次已生成 `run.json`，也按上面的 `render --stage-timing workflow` 命令刷新失败尝试耗时 → 重新调度 integrator 传入 `last_failure_summary`（`stage_retry_count[5]` 上限 2；integrator 内部已有 5 次调试闭环，两级预算独立）；超限 → `phase=FAILED`、`failure_reason=BLOCKED_INTEGRATION`
   - `[DESIGN_ERROR]` → 设计修订循环路径 B：对**失败根因指向的函数**备份其 `DESIGN.md` → `retry_count += 1` → 该函数重跑 Stage 1→2→3 → 通过后**重新执行 Stage 5**（全量重集成，集成脚本幂等）
 
 ## 8. harness 设计修订特例
