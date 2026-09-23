@@ -130,38 +130,7 @@ last_seen: FA 3-impl perf comparison 2026-09-07
 
 ---
 
-### CG-2026-0002
-
-```yaml
-gap_id: CG-2026-0002
-layer: BishengIR (bishengir-compile, --enable-auto-multi-buffer)
-capability: >-
-  Pipelined 循环（NK >= 2，触发 auto-multi-buffer 多缓冲）之前对 L1(shared) buffer 的
-  整 buffer T.vbrc 广播清零被错误 lowering 为 cbuf-to-cbuf 拷贝
-  （'hivm.hir.copy' op Unsupported copy from cbuf to cbuf! → 编译失败）；
-  NK == 1 时同一构造可正常编译。
-blocked_algo: >-
-  尾块防护类构造受限：多块 KV 流水 kernel 无法在循环前对 GEMM 输入 L1 buffer 做
-  一次性清零；被迫把清零守卫收缩到"仅单块且部分块"（seq_len_kv < block_n）场景，
-  多块场景依赖"块 0 必为整块、后续部分块残留有限值"的数值安全论证绕过。
-evidence:
-  - 复现（本任务 Stage 3）：seq_len=520（NK=9，has_kv_tail=True，循环前
-    T.vbrc(0, v_shared)）→ bishengir-compile 报 'hivm.hir.copy' op Unsupported
-    copy from cbuf to cbuf!（npuir 162:30）+ 'hivm.hir.load' root-alloc 连锁报错；
-    同一 kernel 在 seq_len=16（NK=1）下编译运行通过；
-    去掉该 vbrc 后 520 编译运行精度全通过（原 session 探针 /tmp/opencode/probe，provenance session-local 允许失效）。
-  - 未文档化假设：docs/Tilelang.language/广播类文档（vbrc/brc）无多缓冲交互限制条款；
-    估计依据为本任务探针实测。
-workaround: >-
-  清零守卫收缩为仅 seq_len_kv < block_n（单部分块）时执行（该场景 NK=1 不触发
-  多缓冲）；多块尾块场景依据有限残留值安全性免清零（本任务实测通过）。
-occurrences: 1
-tasks: [multi_head_attention/_gqa_prefill_fwd_kernel Stage 3 first_impl]
-toolchain_stamp: tilelang 67db6f3 (2026-09-04) + CANN 26.0.rc1 + 910B2C(IT21HMDB01-B2) + torch_npu 2.7.1
-status: open
-created_by: multi_head_attention/_gqa_prefill_fwd_kernel s3 attempt1 2026-09-04
-last_seen: multi_head_attention/_gqa_prefill_fwd_kernel s3 attempt1 2026-09-04
-```
+### CG-2026-0002 → 已升级 recurring，条目移入下方 Recurring 区（2026-09-20 occurrences 2：Expert T.copy L1→L1 第二形态独立识别）
 
 ### CG-2026-0001
 
@@ -366,6 +335,147 @@ created_by: multi_head_attention/_gqa_prefill_fwd_kernel 第六轮 Stage 4（dis
 last_seen: multi_head_attention-_gqa_prefill_fwd_kernel-20260916T033847Z 第六轮 Stage 4（2026-09-16）
 ```
 
+### CG-2026-0013
+
+```yaml
+gap_id: CG-2026-0013
+layer: Frontend API（TILELANG_ASCEND_MODE 作用域）
+capability: >-
+  编程模式（Expert / Developer）只能经进程级环境变量 TILELANG_ASCEND_MODE 设置，
+  无 per-kernel / per-jit 作用域参数：三处实时读 os.environ——
+  tilelang/language/customize_npuir.py:886（前端 trace，Scope/alloc 形态分派）、
+  tilelang/engine/lower.py:170（device_codegen）、tilelang/jit/jit_npu.py:1789
+  （--disable-hivm-tensor-compile 旗标）。docs/developer/EnvironmentVariables.md L31
+  仅登记环境变量一种设置方式，docs/Tilelang.language/ 无 per-kernel 模式 API
+  （全文无 ASCEND_MODE 条目）。后果：同一进程混编两种模式的 kernel 套件时，
+  后编译者被先入者锁定的模式污染。
+blocked_algo: >-
+  单 pytest 进程跑混合模式算子套件（TileOPs tests/ops/：mha=Expert 两相位
+  Cube/Vector 结构 vs ada_layer_norm/mish/logsumexp=Developer 向量链）——Developer
+  赢则 Expert kernel 报 'hivm.hir.store' op only support copy gm to ub or copy ub
+  to gm or copy ub to ub（mha full-fwd-bf16 变体更在 lower.py:180 device_codegen
+  原生段错误）；Expert 赢则 Developer kernel 报同类 store 约束错（44 case 失败）。
+evidence:
+  - 复现（tilelang 0.1.2+1990aa9 / CANN 8.5.0 / Ascend910B2C，2026-09-18）：
+    TILELANG_ASCEND_MODE=Developer pytest tests/ops/ → mha 失败+段错误（core dump）；
+    TILELANG_ASCEND_MODE=Expert pytest tests/ops/ → 44 failed / 22 passed
+    （ada/mish/logsumexp 全挂，mha 过）；不设环境变量 → import 顺序决定胜负
+    （pytest 参数形式〔目录 vs 整文件 vs node ID〕改变 import 顺序，两次同参运行
+    结果可反转——ada 先 import 则 mha 挂，mha 先 import 则 ada/mish 挂）。
+  - tileops 侧 import 竞争现场：kernel 模块级 os.environ.setdefault
+    （_gqa_prefill_fwd_kernel.py:92/126=Expert；_ada_layer_norm_kernel.py:86/130、
+    mish perf_opt/mish.py:57、logsumexp×2=Developer），setdefault=先 import 者赢。
+  - 源码三读取点（上文 layer 字段）；docs/developer/EnvironmentVariables.md L31。
+workaround: >-
+  tileops 级：kernel 模块 import 时 setdefault（现状，单算子进程正确、混合进程
+  按 import 顺序随机胜负）；或每次 compile 前后显式 set/restore 环境变量（待实施，
+  代价 = 每个 kernel 工厂包一层 env 作用域）。测试级绕法：按模式拆分 pytest 调用。
+  根治需 tilelang 提供 per-kernel 模式参数（如 tilelang.jit(..., mode="Expert")）。
+occurrences: 1
+tasks: [tileops-tests-ops-mode-battle-20260918]
+toolchain_stamp: tilelang 0.1.2+1990aa9(452f447 build) / CANN 8.5.0 / Ascend910B2C / 2026-09-18
+status: open
+created_by: tileops tests/ops/ 混合模式失败排查（conductor 会话），2026-09-18
+last_seen: tileops-tests-ops-mode-battle-20260918（2026-09-18）
+```
+
+### CG-2026-0010
+
+```yaml
+gap_id: CG-2026-0010
+layer: codegen (Developer mode, persistent + gemm 混排)
+capability: >-
+  Developer 模式（auto CV-split）对 persistent 分核结构（T.Kernel(N, is_npu=True)
+  核内 T.serial 多任务）与 T.gemm + v-prefix 向量 op 的混排不支持：运行时崩溃
+  "Illegal instruction, which is usually caused by unaligned UUB addresses"
+  （vector core exception，retCode=0x31），无编译期诊断。Expert 模式（显式双
+  Scope）同结构完全正常。docs 无 Developer/Expert 适用范围条款（未文档化假设：
+  依据双模式 repro + 全仓 24 处 is_npu=True 用例扫描——Developer 仅用于非
+  persistent 网格）。
+blocked_algo: >-
+  persistent 混合算子（Mamba-2 SSD chunk scan 类：Cube 双 gemm 路径 + Vector
+  因子链）在 Developer 模式不可实现——本任务 user_requirement 指定 Developer
+  模式，被迫切换 Expert（GQA/sparse_mla 先例）完成。
+evidence:
+  - 复现：pattern-library repro/TRAP-DEVMODE-PERSIST-GEMM.py（知识域，Expert
+    数值断言 + Developer 崩溃双模式对照）；原件
+    examples/ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel/repro/DEVMODE_PERSIST_CRASH.py（溯源，任务工作区允许失效）
+  - 仓库实态：Developer 仅 non-persistent 先例（flash_attn_npuir_dev.py /
+    fp8_lighting_indexer.py），persistent 混合算子全部 Expert（GQA /
+    sparse_mla_fwd_exp.py）
+  - 任务档案：examples/ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel/RETROSPECTIVE.md（溯源，允许失效）——Stage 3 章节（崩溃日志 + 模式切换链）
+workaround: >-
+  Expert 模式显式双 Scope（T.Scope("Cube")/("Vector") + alloc_L1/alloc_L0C/
+  alloc_ub + sync_block_set/wait + pass_configs 关闭
+  TL_ENABLE_PLAN_AND_UPDATE_BUFFER_ALLOCATION）——完全绕过、无性能代价
+  （pattern-library attention.md PL-1.16 / traps-runtime.md
+  TRAP-DEVMODE-PERSIST-GEMM）。
+occurrences: 1
+tasks: [ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z]
+toolchain_stamp: tilelang 0.1.2+1990aa9fe4 + CANN 8.5.0 + Ascend910B2C / 2026-09-17
+status: open
+created_by: ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel Stage 3（distill 登记），2026-09-17
+last_seen: ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z Stage 3（2026-09-17）
+```
+
+### CG-2026-0011
+
+```yaml
+gap_id: CG-2026-0011
+layer: Frontend API（Cube gemm dst 形态 / L0C 累加原语）
+capability: >-
+  T.gemm 的 dst 不支持 L0C region 写（单 [Q,bp] 大 acc 与 per-lt band gemm 的
+  [64,64] 小 dst 不可共用同一 L0C 张量的不同区域），且无「两 L0C acc 相加」
+  原语——跨 lt 的累加结果无法在 L0C 域合并，必须经 GM/UB 中转。（未文档化
+  假设：docs/Tilelang.language/线性代数操作/T.gemm.md 无 region dst 条款，
+  依据本任务优化候选的结构分析。）
+blocked_algo: >-
+  SSD chunk scan history 路径的 M=256 合并 gemm（1 读 1 gemm/任务，消除
+  per-lt gemm 碎片）不可实现——保持 per-lt [64,64] band gemm 分块形态，
+  gemm 指令数 4/任务无法进一步合并（该候选列为 blocked，opt_log §5）。
+evidence:
+  - examples/ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel/perf_opt/opt_log.md §5（溯源，允许失效）——blocked 候选清单（history M=256 合并 gemm 行：API 阻塞点 + dst 形态分析）
+workaround: >-
+  保持 per-lt band gemm 分块（每 lt 单条 gemm，ws 写侧块连续布局配合——
+  elementwise.md PL-1.14 两全形态）；性能缺口由深度 2 任务流水与 AIV 分片
+  在其他维度补偿（终局 2.91×）。
+occurrences: 1
+tasks: [ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z]
+toolchain_stamp: tilelang 0.1.2+1990aa9fe4 + CANN 8.5.0 + Ascend910B2C / 2026-09-17
+status: open
+created_by: ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel Stage 4（distill 登记），2026-09-17
+last_seen: ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z Stage 4（2026-09-17）
+```
+
+### CG-2026-0012
+
+```yaml
+gap_id: CG-2026-0012
+layer: BishengIR（auto-multi-buffer pass，动态 subview 支配性）
+capability: >-
+  task 级装载的 UB 行 buffer（如 [1,Q] 因子行）在内层循环以动态偏移切片消费
+  时，--enable-auto-multi-buffer=true 产出非支配 IR：error: operand #2 does
+  not dominate this use（Q≥128 切片非全宽触发；Q=64 全宽不触发）——合法的
+  UB→UB 动态 extent copy 形态被 pass 破坏支配性。
+blocked_algo: >-
+  「task 级 dA/dt 行装载」优化（省 12 次 tiny GM 读/任务）不可实现——被迫
+  退回 per-block GM 直载（基线形态）；该候选与 UB 容量候选同列 blocked
+  （opt_log §5，v3 分支双重 blocked 实证）。
+evidence:
+  - examples/ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel/perf_opt/logs/round1/v3_hoist_L0.log（溯源，允许失效——报错全文）
+  - pattern-library traps-compiler.md TRAP-UB-dynsubview-dominance（形态与
+    绕法三则 + 知识域 repro/PL-1.13 关联骨架）
+workaround: >-
+  ① per-block GM 直载；② 切片偏移静态化（trace 分派）；③ 关
+  auto-multi-buffer 未验证（全局改变 L1/UB 多缓冲行为，风险自担）。
+occurrences: 1
+tasks: [ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z]
+toolchain_stamp: tilelang 0.1.2+1990aa9fe4 + CANN 8.5.0 + Ascend910B2C / 2026-09-17
+status: open
+created_by: ssd_chunk_scan/_ssd_chunk_scan_fwd_kernel Stage 4（distill 登记），2026-09-17
+last_seen: ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z Stage 4（2026-09-17）
+```
+
 ### CG-2026-0008 → 已升级 recurring，条目移入下方 Recurring 区（2026-09-15 occurrences 2）
 
 ---
@@ -400,6 +510,7 @@ evidence:
   - dim=64 smoke ~161.7KB 可过（预算-实际差在窄变体不越界）
   - 第二证（task 20260915T080600Z 第五轮 Stage 4 Phase 1）：probe_ub.py 编译探针 4 点标定（6797758）——(64,256) +9.6% / (80,256) +12.2% / (96,256) +12.0% / (128,256) +12.1%（auto-multi-buffer=false 下仍在）+ 漏计小 buffer 实证（DESIGN §4.5 漏计 ub_cond2 8.2KB）
   - 第三数据点（task 20260916T033847Z 第六轮 r9 precision_fix，a13585dc，**不计 occurrences**——本轮阻塞项为分派守卫组合而非分配差，且实测方向相反系反例非阻塞）：显式 alloc 结构（全 UB buffer 首维 = half 的逐 buffer 显式分配）手工核算 214080B vs BishengIR 实际 210080B（ratio 0.981，actual 低于手工）——系数结构依赖的反例数据点，正负两向偏差均无文档，强化「逐 buffer 分配可见性」诉求；核算镜像 + pre-fix 溢出断言：pattern-library/repro/PL-1.12-bn-clamp-bm-guard.py（系数边界同步记入 constants.md CONST-capacity-910B2C / attention.md PL-1.12 r9 update）
+  - 第四数据点（task ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260917T035420Z Stage 4，1990aa9fe4，**不计 occurrences**——无分配差阻塞，属显式 alloc 结构依赖的跨族确认）：Expert 直差分因子链（mamba 族 MixCV）手工峰值 ~179KB ≈ 192KB 上限 93%；v3 变体 +16KB 手工 → 实测 195.1KB 报错（偏差 <2%，显式 alloc ≈ 手工核算跨工具链跨族再证）；bl=128 编译实测需 582KB/357KB vs 192KB 容量否决（constants.md CONST-capacity 第三数据点）
 workaround: >-
   ① 窄 config 逐字路径交付（Stage 3 L1 门禁验证过的 traced 变体）；② 设计期预算按
   ×1.10–1.12 系数放大（constants.md CONST-capacity-910B2C 已收录，勿漏计小 buffer）；
@@ -429,6 +540,70 @@ last_seen: multi_head_attention-_gqa_prefill_fwd_kernel-20260916T033847Z 第六�
 ```
 
 > **升级依据**：task 20260915T025507Z（Stage 5 集成期发现，28783f45）+ task 20260915T080600Z（第五轮 Stage 4 编译探针重校，6797758）——两个不同任务跨 commit 独立识别并定量标定，达 ≥2 任务阈值。capability 补齐提案已产出（见条目 proposal 字段：逐 buffer 分配清单输出 / 差值文档化二选一），待向用户显式列出并推动（外部 issue 须用户批准后建）。
+
+---
+
+### CG-2026-0002
+
+```yaml
+gap_id: CG-2026-0002
+layer: BishengIR (bishengir-compile, cbuf→cbuf copy)
+capability: >-
+  L1（cbuf）域内搬运方向整体不支持：'hivm.hir.copy' op Unsupported copy from
+  cbuf to cbuf! → 编译失败。两种触发形态：① 首证（Developer）——Pipelined 循环
+  （NK >= 2，触发 auto-multi-buffer 多缓冲）之前对 L1(shared) buffer 的整 buffer
+  T.vbrc 广播清零被错误 lowering 为 cbuf-to-cbuf 拷贝（NK == 1 时同一构造可正常
+  编译）；② 第二证（Expert，2026-09-20）——显式 T.copy(l1_a, l1_b) 的 L1→L1
+  方向直接硬失败（最小 Expert 探针实证，非 lowering 路径）——缺口本体为
+  cbuf→cbuf 搬运方向整体不支持，不限 vbrc lowering。
+blocked_algo: >-
+  ① 尾块防护类构造受限（首证）：多块 KV 流水 kernel 无法在循环前对 GEMM 输入
+  L1 buffer 做一次性清零；被迫把清零守卫收缩到"仅单块且部分块"（seq_len_kv
+  < block_n）场景，多块场景依赖有限残留值安全性论证绕过。② L1 域内重排/组装
+  类构造受限（第二证）：band 组装「先读入小 buffer 再组装到大 buffer」两跳形态
+  不可实现——被迫单 buffer GM→L1 列偏移直载形态（每 band 块一次 GM 读，无 L1
+  域内中转）或 GM 中转。
+evidence:
+  - 复现（首证任务 Stage 3）：seq_len=520（NK=9，has_kv_tail=True，循环前
+    T.vbrc(0, v_shared)）→ bishengir-compile 报 'hivm.hir.copy' op Unsupported
+    copy from cbuf to cbuf!（npuir 162:30）+ 'hivm.hir.load' root-alloc 连锁报错；
+    同一 kernel 在 seq_len=16（NK=1）下编译运行通过；去掉该 vbrc 后 520 编译运行
+    精度全通过（原 session 探针 /tmp/opencode/probe，provenance session-local 允许失效）。
+  - 未文档化假设（首证）：docs/Tilelang.language/广播类文档（vbrc/brc）无多缓冲
+    交互限制条款；估计依据为本任务探针实测。
+  - 复现（第二证，task ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260920T122332Z
+    Stage 2 复检轮）：最小 Expert kernel（T.Kernel(1, is_npu=True) + T.Scope("Cube")
+    + 两个 T.alloc_L1([64,64],"float16") + T.copy(l1_a, l1_b)）→ bishengir-compile
+    err code 1 报同款 'Unsupported copy from cbuf to cbuf!'；三证合一——docs
+    T.copy.md §2.3 搬运方向表无 L1→L1 方向（GM→UB/UB→GM/UB→UB/GM→L1/L0C→GM）、
+    全仓 examples 零先例、探针实证（REVIEW.md 复检轮机械复核段；探针原件
+    /tmp/opencode/probe transient，provenance 允许失效）。
+workaround: >-
+  ① 首证：清零守卫收缩为仅 seq_len_kv < block_n（单部分块）时执行（NK=1 不触发
+  多缓冲）；多块尾块场景依据有限残留值安全性免清零。② 第二证：L1 域内「重排/
+  组装」意图落为单 buffer GM→L1 列偏移 dst 直载（T.copy(ws[...,0:bl,0:ts],
+  l1_band[0:bl,s0:s0+ts])，src/dst 双侧尾块裁剪）+ 单条 band gemm——探针 2 在
+  4515de8 编译通过（与 TRAP-L1-band-dst-tail-overrun 联防）；或经 GM 中转。
+  绕法知识条目化提案见 queue VP-2026-0095（pattern-library traps-compiler.md）。
+occurrences: 2
+tasks: [multi_head_attention/_gqa_prefill_fwd_kernel Stage 3 first_impl 2026-09-04, ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260920T122332Z Stage 2 2026-09-20]
+toolchain_stamp: 首证 tilelang 67db6f3 (2026-09-04) + CANN 26.0.rc1 + 910B2C(IT21HMDB01-B2) + torch_npu 2.7.1；第二证 tilelang 0.1.2+4515de8 + CANN 8.5.0 + Ascend910B2C / 2026-09-20
+status: recurring
+proposal: >-
+  目标层 BishengIR / Frontend API。建议改动（二选一或组合）：① 支持 cbuf→cbuf
+  copy lowering（L1 域内搬运原语，消除「域内重排必经 GM」约束）；② 至少将该
+  方向缺口文档化——T.copy.md §2.3 搬运方向表显式标注 L1→L1 不支持 + 报错信息
+  指向推荐形态（单 buffer GM→L1 列偏移直载）。收益量化（两任务实测）：首证使
+  尾块清零守卫收缩（多块场景裸奔依赖残留值论证）；第二证使 band 组装类结构
+  被 forced 单 buffer 直载形态（每 band 块一次 GM 读）——L1 域内中转可消该类
+  GM 重读。受影响算子：L1 域内重排/组装类（MixCV band 组装、多块流水清零守卫）。
+  issue 草稿（[npuir] 前缀，须用户批准后建）：[npuir] cbuf→cbuf copy 不支持且
+  无文档（L1 域内重排/清零构造不可表达，vbrc lowering 与显式 T.copy 双路径同报错）。
+created_by: multi_head_attention/_gqa_prefill_fwd_kernel s3 attempt1 2026-09-04
+last_seen: ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260920T122332Z Stage 2 复检轮（2026-09-20）
+```
+
+> **升级依据**：task multi_head_attention/_gqa_prefill_fwd_kernel Stage 3（2026-09-04，Developer vbrc lowering 路径）+ task ssd_chunk_scan-_ssd_chunk_scan_fwd_kernel-20260920T122332Z Stage 2（2026-09-20，Expert 显式 T.copy 路径）——两个不同任务、双触发形态、跨工具链（67db6f3/CANN 26.0.rc1 → 4515de8/CANN 8.5.0）独立识别同一缺口（cbuf→cbuf 搬运不支持），达 ≥2 任务阈值。proposal 字段已产出，待向用户显式列出并推动（外部 issue 须用户批准后建）。
 
 ---
 

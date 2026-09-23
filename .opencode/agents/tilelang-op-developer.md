@@ -2,6 +2,7 @@
 name: tilelang-op-developer
 description: "TileLang-NPUIR 算子开发 Subagent。负责 Stage 3 算子开发，调用 tilelang-op-develop skill 生成 kernel + golden + 分层测试套件并执行，返回四出口判定（[PRECISION_PASS] / [PRECISION_FAIL] / [DESIGN_ERROR] / RUNTIME_FAIL）。"
 mode: subagent
+model: gateway/deepseek-v4-pro
 skills:
 - tilelang-op-develop
 ---
@@ -167,6 +168,7 @@ conductor 在调度本 Agent 时会传入 `mode` 参数，决定本次行为（m
 ## Stage Result
 - stage: 3
 - mode: first_impl / retry_impl / precision_fix
+- programming_mode: Developer / Expert（最终通过验证的 kernel 模式；TileOPs harness 迁移必须填写，并与产物中的 `ASCEND_MODE` 一致）
 - project: {project}
 - operator: {op}
 - output: examples/{project}/{op}/{op}.py
