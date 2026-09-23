@@ -382,8 +382,8 @@ def test_workflow_stage_timing_is_optional_and_refreshable(tmp_path):
     )
     markdown = paths["markdown"].read_text(encoding="utf-8")
     html = paths["html"].read_text(encoding="utf-8")
-    assert "Stage 1" in markdown and "50.000" in markdown
-    assert "Stage Time (s)" in markdown and "62.000" in markdown
+    assert "Stage 1" in markdown and "00:00:50.000" in markdown
+    assert "Stage Time (HH:MM:SS)" in markdown and "00:01:02.000" in markdown
     assert '<details class="operator-stage-timing">' in html
     assert '<details class="stage-timing" id="operator-1-stage-timing-1">' in html
     assert "runtime" in html
@@ -466,11 +466,124 @@ def test_multi_operator_stage_timing_is_grouped_per_operator(tmp_path):
     paths = write_reports(run, tmp_path / "report")
     markdown = paths["markdown"].read_text(encoding="utf-8")
     html = paths["html"].read_text(encoding="utf-8")
-    assert "| FirstOp |" in markdown and "10.000" in markdown
-    assert "| SecondOp |" in markdown and "25.000" in markdown
+    assert "| FirstOp |" in markdown and "00:00:10.000" in markdown
+    assert "| SecondOp |" in markdown and "00:00:25.000" in markdown
     assert html.count('<details class="operator-stage-timing">') == 2
     assert "operator-1-stage-timing-3" in html
     assert "operator-2-stage-timing-3" in html
+
+
+def test_stage_timing_sources_are_discovered_from_manifest_locations(tmp_path):
+    from tileops.reporting.stage_timing import discover_stage_timing_sources
+
+    tileops_root = tmp_path / "examples" / "TileOPs"
+    external = tmp_path / "examples" / "demo_op"
+    integrated = tileops_root / "tileops" / "kernels" / "demo" / "demo_op"
+    (external / "func_a").mkdir(parents=True)
+    (integrated / "demo_op_kernel").mkdir(parents=True)
+    for path in (
+        external / ".task_timeline.jsonl",
+        external / "func_a" / ".task_timeline.jsonl",
+        integrated / "demo_op_kernel" / ".task_timeline.jsonl",
+    ):
+        path.write_text("{}\n", encoding="utf-8")
+    manifest = {
+        "DemoOp": {"source": {"kernel": "tileops/kernels/demo/demo_op/demo_op.py"}},
+        "NoTimelineOp": {"source": {"kernel": "tileops/kernels/demo/no_timeline/no_timeline.py"}},
+    }
+
+    single = discover_stage_timing_sources(tileops_root, "DemoOp", manifest)
+    assert len(single) == 3
+    assert all(source.startswith("DemoOp=") for source in single)
+    assert any("func_a" in source for source in single)
+    assert any("demo_op_kernel" in source for source in single)
+
+    full = discover_stage_timing_sources(tileops_root, "all", manifest)
+    assert full == single
+
+
+def test_missing_stage_timing_is_rendered_as_na(tmp_path):
+    from tileops.reporting.report import write_reports
+    from tileops.reporting.stage_timing import load_stage_timing
+
+    timing = load_stage_timing([], operator="all")
+    assert timing["duration_s_total"] is None
+    assert timing["stages"] == []
+    assert timing["operators"] == []
+
+    missing = load_stage_timing(
+        ["DemoOp=missing/.task_timeline.jsonl"],
+        operator="all",
+        base_dir=tmp_path,
+    )
+    assert missing["duration_s_total"] is None
+
+    run = {
+        "operator": "DemoOp",
+        "status": "passed",
+        "summary": {},
+        "correctness": {"cases": []},
+        "performance": {"cases": []},
+        "stage_timing": timing,
+    }
+    paths = write_reports(run, tmp_path / "report")
+    markdown = paths["markdown"].read_text(encoding="utf-8")
+    html = paths["html"].read_text(encoding="utf-8")
+    assert "| DemoOp |" in markdown
+    assert "Stage Time (HH:MM:SS)" in markdown
+    assert "N/A" in markdown
+    assert "N/A" in html
+
+
+def test_stage_duration_uses_hours_minutes_and_seconds(tmp_path):
+    from tileops.reporting.report import write_reports
+
+    run = {
+        "operator": "DemoOp",
+        "status": "passed",
+        "summary": {},
+        "correctness": {"cases": []},
+        "performance": {"cases": []},
+        "stage_timing": {
+            "duration_s_total": 3723.25,
+            "stages": [
+                {
+                    "stage": 3,
+                    "name": "Develop",
+                    "duration_s_total": 3723.25,
+                    "attempt_count": 1,
+                    "attempts": [
+                        {
+                            "scope": "demo_op",
+                            "outcome": "completed",
+                            "duration_s": 3723.25,
+                        }
+                    ],
+                }
+            ],
+            "operators": [
+                {
+                    "operator": "DemoOp",
+                    "duration_s_total": 3723.25,
+                    "stages": [
+                        {
+                            "stage": 3,
+                            "name": "Develop",
+                            "duration_s_total": 3723.25,
+                            "attempt_count": 1,
+                            "attempts": [],
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    paths = write_reports(run, tmp_path / "report")
+    markdown = paths["markdown"].read_text(encoding="utf-8")
+    html = paths["html"].read_text(encoding="utf-8")
+    assert "01:02:03.250" in markdown
+    assert "01:02:03.250" in html
+    assert "Stage Time (HH:MM:SS)" in markdown
 
 
 def test_runner_gates_benchmark_and_writes_report(tmp_path, monkeypatch):

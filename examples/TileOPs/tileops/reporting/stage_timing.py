@@ -16,6 +16,46 @@ STAGE_NAMES = {
     5: "Integrate / 集成",
 }
 
+TIMELINE_NAME = ".task_timeline.jsonl"
+
+
+def discover_stage_timing_sources(
+    root: str | Path,
+    operator: str,
+    manifest: dict[str, Any],
+) -> list[str]:
+    """Find timeline files from each manifest operator's kernel location.
+
+    Migration workflows live beside ``examples/TileOPs`` in
+    ``examples/<op_slug>``. Optimize workflows may instead keep their state
+    below the integrated kernel package. Search both locations recursively so
+    operator-level and per-function timelines are included.
+    """
+    repo_root = Path(root).resolve()
+    if operator != "all" and operator not in manifest:
+        return []
+
+    names = sorted(manifest) if operator == "all" else [operator]
+    discovered: list[str] = []
+    seen: set[Path] = set()
+    for name in names:
+        source = (manifest.get(name) or {}).get("source") or {}
+        kernel = source.get("kernel")
+        if not kernel:
+            continue
+        kernel_dir = (repo_root / str(kernel)).resolve().parent
+        op_slug = kernel_dir.name
+        for search_root in (repo_root.parent / op_slug, kernel_dir):
+            if not search_root.is_dir():
+                continue
+            for path in sorted(search_root.rglob(TIMELINE_NAME)):
+                resolved = path.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                discovered.append(f"{name}={resolved}")
+    return discovered
+
 
 def _split_source(
     source: str | Path, default_operator: str | None, base_dir: Path | None
@@ -136,9 +176,6 @@ def load_stage_timing(
     A source is an operator/function directory or its .task_timeline.jsonl file.
     Each completed/failed event already has statectl's start-to-end duration_s.
     """
-    if not sources:
-        raise ValueError("--stage-timing workflow requires --timing-source")
-
     if operator == "all" and any("=" not in str(source) for source in sources):
         raise ValueError(
             "multi-operator stage timing requires OPERATOR=PATH for every --timing-source"
@@ -149,9 +186,9 @@ def load_stage_timing(
     for source in sources:
         source_operator, path = _split_source(source, operator, resolved_base)
         if path.is_dir():
-            path /= ".task_timeline.jsonl"
+            path /= TIMELINE_NAME
         if not path.is_file():
-            raise FileNotFoundError(f"stage timing source does not exist: {path}")
+            continue
         if any(existing == path for existing, _, _ in paths):
             raise ValueError(f"duplicate stage timing source: {path}")
         paths.append((path, path.parent.name, source_operator))

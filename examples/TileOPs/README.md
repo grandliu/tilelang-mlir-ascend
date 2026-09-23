@@ -99,39 +99,38 @@ without rerunning NPU tests:
 tileops-report render reports/tileops/<run-id>/run.json
 ```
 
-Workflow Stage timing is optional and off by default. For a conductor task,
-pass each directory containing a statectl `.task_timeline.jsonl` file (one
-operator directory plus any per-function directories):
+Workflow Stage timing is optional and off by default. With
+`--stage-timing workflow`, the report discovers statectl `.task_timeline.jsonl` files from each
+manifest operator's kernel location. It searches both the sibling
+`examples/<op_slug>/` workflow tree and the integrated kernel package:
 
 ```bash
-tileops-report run --op MishFwdOp --prof-mode msprof \
-  --stage-timing workflow --timing-source ../mish \
-  --timing-source ../mish/function_name
+tileops-report run --op MishFwdOp --prof-mode msprof --stage-timing workflow
 ```
 
-The reports then show total duration for each workflow Stage and expandable
-per-attempt durations. These are process elapsed times in seconds, distinct
-from kernel latency in microseconds. A Stage still running when `run` finishes
-has no final duration yet. After the conductor completes that Stage, refresh
-the same report without rerunning tests:
+The reports show total duration for each workflow Stage and expandable
+per-attempt durations in `HH:MM:SS.mmm` format. The underlying values remain
+process elapsed seconds, distinct from kernel latency in microseconds. A Stage
+still running when `run` finishes has no final duration yet. After the conductor
+completes that Stage, refresh the same report without rerunning tests:
 
 ```bash
-tileops-report render reports/tileops/<run-id>/run.json \
-  --stage-timing workflow --timing-source ../mish \
-  --timing-source ../mish/function_name
+tileops-report render reports/tileops/<run-id>/run.json --stage-timing workflow
 ```
 
 The Operator Analysis table includes each operator's accumulated Stage time.
 The Operator Details section contains an expandable workflow timing block for
-that operator. For a multi-operator `--all` report, label every source with its
-manifest operator name so timelines are grouped correctly:
+that operator. Full reports discover and label every available operator timeline
+automatically:
 
 ```bash
-tileops-report run --all --stage-timing workflow \
-  --timing-source MishFwdOp=../mish \
-  --timing-source MishFwdOp=../mish/function_name \
-  --timing-source OtherOp=../other_op
+tileops-report run --all --stage-timing workflow
 ```
+
+`--timing-source` remains available as an explicit override for nonstandard
+locations; use `OPERATOR=PATH` when overriding sources for `--all`.
+Missing timeline files do not fail the test run; the corresponding Stage time
+is reported as `N/A`. Existing timeline files with invalid JSON still fail fast.
 
 Report runs must be serial.  Do not pass pytest-xdist ``-n`` or
 ``--numprocesses`` options: benchmark records are process-local and cannot yet be

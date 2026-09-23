@@ -6,9 +6,10 @@ import argparse
 import json
 from pathlib import Path
 
+from tileops.manifest import load_manifest
 from tileops.reporting.report import write_reports
-from tileops.reporting.runner import list_operators, run_operator
-from tileops.reporting.stage_timing import load_stage_timing
+from tileops.reporting.runner import list_operators, project_root, run_operator
+from tileops.reporting.stage_timing import discover_stage_timing_sources, load_stage_timing
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -44,7 +45,7 @@ def _parser() -> argparse.ArgumentParser:
         "--timing-source",
         action="append",
         default=[],
-        help="workflow directory or timeline; use OPERATOR=PATH with --all",
+        help="workflow directory or timeline; omitted to discover it from manifest locations",
     )
     run.add_argument(
         "--pytest-arg",
@@ -86,8 +87,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.stage_timing == "off":
             run.pop("stage_timing", None)
         elif args.stage_timing == "workflow":
+            timing_sources = args.timing_source or discover_stage_timing_sources(
+                project_root(), str(run.get("operator") or "all"), load_manifest()
+            )
             run["stage_timing"] = load_stage_timing(
-                args.timing_source, operator=run.get("operator")
+                timing_sources,
+                operator=run.get("operator"),
+                base_dir=project_root(),
             )
         output = Path(args.output_dir).resolve() if args.output_dir else source.parent
         paths = write_reports(run, output)

@@ -18,7 +18,7 @@ from tileops.reporting.analyzer import analyze_run
 from tileops.reporting.collector import load_benchmark_report, parse_junit_report
 from tileops.reporting.report import write_reports
 from tileops.reporting.setup_info import collect_setup_info
-from tileops.reporting.stage_timing import load_stage_timing
+from tileops.reporting.stage_timing import discover_stage_timing_sources, load_stage_timing
 
 
 def project_root() -> Path:
@@ -170,6 +170,10 @@ def run_operator(
     # Resolve before running tests so a missing source does not waste a test run.
     resolved_timing_sources = list(timing_sources or [])
     if stage_timing == "workflow":
+        if not resolved_timing_sources:
+            resolved_timing_sources = discover_stage_timing_sources(
+                repo_root, operator, load_manifest()
+            )
         load_stage_timing(resolved_timing_sources, operator=operator, base_dir=repo_root)
     resolved_test, resolved_benchmark = resolve_operator(
         operator, test_file=test_file, benchmark_file=benchmark_file

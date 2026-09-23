@@ -247,18 +247,27 @@ def _setup_tables_markdown(run: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _fmt_duration(value: Any) -> str:
+    """Format elapsed seconds as hours:minutes:seconds."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "N/A"
+    hours, remainder = divmod(float(value), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{int(hours):02d}:{int(minutes):02d}:{seconds:06.3f}"
+
+
 def _stage_timing_markdown(timing: dict[str, Any] | None, operator_index: int) -> list[str]:
     if not timing:
         return []
     total = timing.get("duration_s_total")
-    total_text = f"{_fmt(total, 3)} s" if total is not None else "N/A"
+    total_text = _fmt_duration(total)
     lines = [
         "<details>",
         f"<summary><strong>Workflow Stage Timing / 流程阶段耗时 — Total: {total_text}</strong></summary>",
         "",
-        "单位：秒；累计耗时仅包含有 duration_s 的完成或失败尝试。",
+        "显示格式：时:分:秒；累计耗时仅包含有 duration_s 的完成或失败尝试。",
         "",
-        "| Stage | Total (s) | Attempts |",
+        "| Stage | Total (HH:MM:SS) | Attempts |",
         "|---|---:|---:|",
     ]
     for row in timing.get("stages", []):
@@ -266,7 +275,7 @@ def _stage_timing_markdown(timing: dict[str, Any] | None, operator_index: int) -
         lines.append(
             f"| [Stage {stage} — {_md_cell(row['name'])}]"
             f"(#operator-{operator_index}-stage-timing-{stage}) | "
-            f"{_fmt(row.get('duration_s_total'), 3)} | {row.get('attempt_count', 0)} |"
+            f"{_fmt_duration(row.get('duration_s_total'))} | {row.get('attempt_count', 0)} |"
         )
     lines.append("")
     for row in timing.get("stages", []):
@@ -276,7 +285,7 @@ def _stage_timing_markdown(timing: dict[str, Any] | None, operator_index: int) -
                 f'<a id="operator-{operator_index}-stage-timing-{stage}"></a>',
                 f"### Stage {stage} — {row['name']}",
                 "",
-                "| Scope | Attempt | Result | Duration (s) | Verdict |",
+                "| Scope | Attempt | Result | Duration (HH:MM:SS) | Verdict |",
                 "|---|---:|---|---:|---|",
             ]
         )
@@ -284,7 +293,7 @@ def _stage_timing_markdown(timing: dict[str, Any] | None, operator_index: int) -
             lines.append(
                 f"| {_md_cell(attempt.get('scope') or '-')} | {index} | "
                 f"{_md_cell(attempt.get('outcome') or '-')} | "
-                f"{_fmt(attempt.get('duration_s'), 3)} | "
+                f"{_fmt_duration(attempt.get('duration_s'))} | "
                 f"{_md_cell(attempt.get('verdict') or '-')} |"
             )
         lines.append("")
@@ -296,7 +305,7 @@ def _stage_timing_html(timing: dict[str, Any] | None, operator_index: int) -> st
     if not timing:
         return ""
     total = timing.get("duration_s_total")
-    total_text = f"{_fmt(total, 3)} s" if total is not None else "N/A"
+    total_text = _fmt_duration(total)
     blocks = []
     for row in timing.get("stages", []):
         attempts = "".join(
@@ -304,7 +313,7 @@ def _stage_timing_html(timing: dict[str, Any] | None, operator_index: int) -> st
             f"<td>{html.escape(str(attempt.get('scope') or '-'))}</td>"
             f"<td>{index}</td>"
             f"<td>{html.escape(str(attempt.get('outcome') or '-'))}</td>"
-            f"<td>{_fmt(attempt.get('duration_s'), 3)}</td>"
+            f"<td>{_fmt_duration(attempt.get('duration_s'))}</td>"
             f"<td>{html.escape(str(attempt.get('verdict') or '-'))}</td>"
             "</tr>"
             for index, attempt in enumerate(row.get("attempts", []), 1)
@@ -312,17 +321,17 @@ def _stage_timing_html(timing: dict[str, Any] | None, operator_index: int) -> st
         blocks.append(
             f'<details class="stage-timing" id="operator-{operator_index}-stage-timing-{row["stage"]}">'
             f"<summary>Stage {row['stage']} — {html.escape(str(row['name']))}"
-            f" <strong>{_fmt(row.get('duration_s_total'), 3)} s</strong>"
+            f" <strong>{_fmt_duration(row.get('duration_s_total'))}</strong>"
             f" · {row.get('attempt_count', 0)} attempts</summary>"
             '<div class="table-wrap"><table><thead><tr><th>Scope</th><th>Attempt</th>'
-            "<th>Result</th><th>Duration (s)</th><th>Verdict</th></tr></thead>"
+            "<th>Result</th><th>Duration (HH:MM:SS)</th><th>Verdict</th></tr></thead>"
             f"<tbody>{attempts}</tbody></table></div></details>"
         )
     return (
         '<details class="operator-stage-timing">'
         "<summary><strong>Workflow Stage Timing / 流程阶段耗时</strong>"
         f" <span>Total: {total_text}</span></summary>"
-        '<p class="note">单位：秒；累计耗时仅包含有 duration_s 的完成或失败尝试。</p>'
+        '<p class="note">显示格式：时:分:秒；累计耗时仅包含有 duration_s 的完成或失败尝试。</p>'
         f"{''.join(blocks)}</details>"
     )
 
@@ -344,7 +353,7 @@ def render_markdown(run: dict[str, Any]) -> str:
             "",
             "## Operator Analysis / 算子分析",
             "",
-            "| Operator | Correctness | Avg Max Abs Error | Performance Shapes | Ratio Range | Stage Time (s) / 阶段累计耗时 |",
+            "| Operator | Correctness | Avg Max Abs Error | Performance Shapes | Ratio Range | Stage Time (HH:MM:SS) / 阶段累计耗时 |",
             "|---|---:|---:|---:|---:|---:|",
         ]
     )
@@ -354,7 +363,7 @@ def render_markdown(run: dict[str, Any]) -> str:
             f"{_fmt_scientific(operator.get('avg_max_abs_err'))} | "
             f"{operator.get('performance_cases', 0)} | "
             f"{_fmt_range(operator.get('ratio_range'), '%', 2)} | "
-            f"{_fmt(operator.get('stage_duration_s_total'), 3)} |"
+            f"{_fmt_duration(operator.get('stage_duration_s_total'))} |"
         )
     lines.extend(
         [
@@ -488,7 +497,7 @@ def _operator_analysis_rows(run: dict[str, Any]) -> str:
             f'<td class="number">{_fmt_scientific(operator.get("avg_max_abs_err"))}</td>'
             f"<td>{operator.get('performance_cases', 0)}</td>"
             f"<td>{html.escape(_fmt_range(operator.get('ratio_range'), '%', 2))}</td>"
-            f'<td class="number">{_fmt(operator.get("stage_duration_s_total"), 3)}</td>'
+            f'<td class="number">{_fmt_duration(operator.get("stage_duration_s_total"))}</td>'
             "</tr>"
         )
     return "".join(rows) or '<tr><td colspan="7" class="empty">No operator records</td></tr>'
