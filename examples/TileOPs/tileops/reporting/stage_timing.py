@@ -7,7 +7,6 @@ import math
 from pathlib import Path
 from typing import Any
 
-
 STAGE_NAMES = {
     0: "Scaffold / 脚手架",
     1: "Design / 设计",

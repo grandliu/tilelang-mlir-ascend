@@ -311,9 +311,9 @@ def _stage_timing_html(timing: dict[str, Any] | None, operator_index: int) -> st
         )
         blocks.append(
             f'<details class="stage-timing" id="operator-{operator_index}-stage-timing-{row["stage"]}">'
-            f'<summary>Stage {row["stage"]} — {html.escape(str(row["name"]))}'
-            f' <strong>{_fmt(row.get("duration_s_total"), 3)} s</strong>'
-            f' · {row.get("attempt_count", 0)} attempts</summary>'
+            f"<summary>Stage {row['stage']} — {html.escape(str(row['name']))}"
+            f" <strong>{_fmt(row.get('duration_s_total'), 3)} s</strong>"
+            f" · {row.get('attempt_count', 0)} attempts</summary>"
             '<div class="table-wrap"><table><thead><tr><th>Scope</th><th>Attempt</th>'
             "<th>Result</th><th>Duration (s)</th><th>Verdict</th></tr></thead>"
             f"<tbody>{attempts}</tbody></table></div></details>"
@@ -323,7 +323,7 @@ def _stage_timing_html(timing: dict[str, Any] | None, operator_index: int) -> st
         "<summary><strong>Workflow Stage Timing / 流程阶段耗时</strong>"
         f" <span>Total: {total_text}</span></summary>"
         '<p class="note">单位：秒；累计耗时仅包含有 duration_s 的完成或失败尝试。</p>'
-        f'{"".join(blocks)}</details>'
+        f"{''.join(blocks)}</details>"
     )
 
 
@@ -563,7 +563,7 @@ def _operator_details_section(run: dict[str, Any]) -> str:
         blocks.append(
             f'<div class="operator-block" id="operator-{operator_index}">'
             f"<h4>4.{operator_index} {html.escape(str(name))}</h4>"
-            f'{_stage_timing_html(operator.get("stage_timing"), operator_index)}'
+            f"{_stage_timing_html(operator.get('stage_timing'), operator_index)}"
             '<div class="table-wrap"><table>'
             f"<caption>Table 4.{operator_index}. Per-shape performance results</caption>"
             "<thead><tr><th>Label</th><th>Latency (us)</th><th>Ratio</th>"
