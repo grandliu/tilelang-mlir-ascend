@@ -35,12 +35,16 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--reports-dir", default="reports/tileops")
     run.add_argument("--timeout", type=int, help="timeout in seconds for each pytest stage")
     run.add_argument(
-        "--stage-timing", choices=("off", "workflow"), default="off",
+        "--stage-timing",
+        choices=("off", "workflow"),
+        default="off",
         help="include workflow Stage durations in the report (default: off)",
     )
     run.add_argument(
-        "--timing-source", action="append", default=[],
-        help="workflow operator/function directory or .task_timeline.jsonl; repeat for each source",
+        "--timing-source",
+        action="append",
+        default=[],
+        help="workflow directory or timeline; use OPERATOR=PATH with --all",
     )
     run.add_argument(
         "--pytest-arg",
@@ -53,10 +57,16 @@ def _parser() -> argparse.ArgumentParser:
     render.add_argument("run_json")
     render.add_argument("--output-dir")
     render.add_argument(
-        "--stage-timing", choices=("off", "workflow"),
+        "--stage-timing",
+        choices=("off", "workflow"),
         help="override saved stage timing; omitted preserves run.json",
     )
-    render.add_argument("--timing-source", action="append", default=[])
+    render.add_argument(
+        "--timing-source",
+        action="append",
+        default=[],
+        help="workflow directory or timeline; use OPERATOR=PATH for multi-operator reports",
+    )
     return parser
 
 
@@ -76,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.stage_timing == "off":
             run.pop("stage_timing", None)
         elif args.stage_timing == "workflow":
-            run["stage_timing"] = load_stage_timing(args.timing_source)
+            run["stage_timing"] = load_stage_timing(
+                args.timing_source, operator=run.get("operator")
+            )
         output = Path(args.output_dir).resolve() if args.output_dir else source.parent
         paths = write_reports(run, output)
         print(f"Reports written to {paths['markdown']} and {paths['html']}")

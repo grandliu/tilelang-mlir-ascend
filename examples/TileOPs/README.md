@@ -121,6 +121,18 @@ tileops-report render reports/tileops/<run-id>/run.json \
   --timing-source ../mish/function_name
 ```
 
+The Operator Analysis table includes each operator's accumulated Stage time.
+The Operator Details section contains an expandable workflow timing block for
+that operator. For a multi-operator `--all` report, label every source with its
+manifest operator name so timelines are grouped correctly:
+
+```bash
+tileops-report run --all --stage-timing workflow \
+  --timing-source MishFwdOp=../mish \
+  --timing-source MishFwdOp=../mish/function_name \
+  --timing-source OtherOp=../other_op
+```
+
 Report runs must be serial.  Do not pass pytest-xdist ``-n`` or
 ``--numprocesses`` options: benchmark records are process-local and cannot yet be
 merged safely across workers.  The CLI rejects these options instead of producing an

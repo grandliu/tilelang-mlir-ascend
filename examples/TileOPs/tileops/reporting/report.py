@@ -212,6 +212,20 @@ def _normalize_run_for_render(run: dict[str, Any]) -> dict[str, Any]:
         operator.setdefault("avg_max_abs_err", sum(errors) / len(errors) if errors else None)
         operator.setdefault("max_abs_err", max(errors) if errors else None)
         operator.setdefault("performance_cases", perf_counts.get(name, 0))
+    timing = normalized.get("stage_timing") or {}
+    timing_by_operator = {
+        str(item.get("operator")): item
+        for item in timing.get("operators", [])
+        if item.get("operator") is not None
+    }
+    operators = normalized.get("operators", [])
+    if not timing_by_operator and timing and len(operators) == 1:
+        timing_by_operator[str(operators[0].get("operator"))] = timing
+    for operator in operators:
+        operator_timing = timing_by_operator.get(str(operator.get("operator")))
+        if operator_timing:
+            operator["stage_timing"] = operator_timing
+            operator["stage_duration_s_total"] = operator_timing.get("duration_s_total")
     summary.setdefault("operator_count", len(normalized.get("operators", [])))
     return normalized
 
@@ -233,28 +247,39 @@ def _setup_tables_markdown(run: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _stage_timing_markdown(run: dict[str, Any]) -> list[str]:
-    timing = run.get("stage_timing")
+def _stage_timing_markdown(timing: dict[str, Any] | None, operator_index: int) -> list[str]:
     if not timing:
         return []
-    lines = ["## Workflow Stage Timing / 流程阶段耗时", "",
-             "单位：秒；总耗时仅累计有 duration_s 的完成或失败尝试。", "",
-             "| Stage | Total (s) | Attempts |", "|---|---:|---:|"]
+    total = timing.get("duration_s_total")
+    total_text = f"{_fmt(total, 3)} s" if total is not None else "N/A"
+    lines = [
+        "<details>",
+        f"<summary><strong>Workflow Stage Timing / 流程阶段耗时 — Total: {total_text}</strong></summary>",
+        "",
+        "单位：秒；累计耗时仅包含有 duration_s 的完成或失败尝试。",
+        "",
+        "| Stage | Total (s) | Attempts |",
+        "|---|---:|---:|",
+    ]
     for row in timing.get("stages", []):
         stage = row["stage"]
         lines.append(
-            f"| [Stage {stage} — {_md_cell(row['name'])}](#stage-timing-{stage}) | "
+            f"| [Stage {stage} — {_md_cell(row['name'])}]"
+            f"(#operator-{operator_index}-stage-timing-{stage}) | "
             f"{_fmt(row.get('duration_s_total'), 3)} | {row.get('attempt_count', 0)} |"
         )
     lines.append("")
     for row in timing.get("stages", []):
         stage = row["stage"]
-        lines.extend([
-            f'<a id="stage-timing-{stage}"></a>',
-            f"### Stage {stage} — {row['name']}", "",
-            "| Scope | Attempt | Result | Duration (s) | Verdict |",
-            "|---|---:|---|---:|---|",
-        ])
+        lines.extend(
+            [
+                f'<a id="operator-{operator_index}-stage-timing-{stage}"></a>',
+                f"### Stage {stage} — {row['name']}",
+                "",
+                "| Scope | Attempt | Result | Duration (s) | Verdict |",
+                "|---|---:|---|---:|---|",
+            ]
+        )
         for index, attempt in enumerate(row.get("attempts", []), 1):
             lines.append(
                 f"| {_md_cell(attempt.get('scope') or '-')} | {index} | "
@@ -263,13 +288,15 @@ def _stage_timing_markdown(run: dict[str, Any]) -> list[str]:
                 f"{_md_cell(attempt.get('verdict') or '-')} |"
             )
         lines.append("")
+    lines.extend(["</details>", ""])
     return lines
 
 
-def _stage_timing_html(run: dict[str, Any]) -> str:
-    timing = run.get("stage_timing")
+def _stage_timing_html(timing: dict[str, Any] | None, operator_index: int) -> str:
     if not timing:
         return ""
+    total = timing.get("duration_s_total")
+    total_text = f"{_fmt(total, 3)} s" if total is not None else "N/A"
     blocks = []
     for row in timing.get("stages", []):
         attempts = "".join(
@@ -283,18 +310,20 @@ def _stage_timing_html(run: dict[str, Any]) -> str:
             for index, attempt in enumerate(row.get("attempts", []), 1)
         )
         blocks.append(
-            f'<details class="stage-timing" id="stage-timing-{row["stage"]}">'
+            f'<details class="stage-timing" id="operator-{operator_index}-stage-timing-{row["stage"]}">'
             f'<summary>Stage {row["stage"]} — {html.escape(str(row["name"]))}'
             f' <strong>{_fmt(row.get("duration_s_total"), 3)} s</strong>'
             f' · {row.get("attempt_count", 0)} attempts</summary>'
             '<div class="table-wrap"><table><thead><tr><th>Scope</th><th>Attempt</th>'
-            '<th>Result</th><th>Duration (s)</th><th>Verdict</th></tr></thead>'
-            f'<tbody>{attempts}</tbody></table></div></details>'
+            "<th>Result</th><th>Duration (s)</th><th>Verdict</th></tr></thead>"
+            f"<tbody>{attempts}</tbody></table></div></details>"
         )
     return (
-        '<section class="section"><h3>Workflow Stage Timing / 流程阶段耗时</h3>'
-        '<p class="note">单位：秒；总耗时仅累计有 duration_s 的完成或失败尝试。</p>'
-        f'{"".join(blocks)}</section>'
+        '<details class="operator-stage-timing">'
+        "<summary><strong>Workflow Stage Timing / 流程阶段耗时</strong>"
+        f" <span>Total: {total_text}</span></summary>"
+        '<p class="note">单位：秒；累计耗时仅包含有 duration_s 的完成或失败尝试。</p>'
+        f'{"".join(blocks)}</details>'
     )
 
 
@@ -304,7 +333,6 @@ def render_markdown(run: dict[str, Any]) -> str:
     summary = run.get("summary") or {}
     lines = [f"# TileOPs Evaluation Report: {run.get('operator', 'unknown')}", ""]
     lines.extend(_setup_tables_markdown(run))
-    lines.extend(_stage_timing_markdown(run))
     lines.extend(
         [
             "## Results Overview / 结果总览",
@@ -316,8 +344,8 @@ def render_markdown(run: dict[str, Any]) -> str:
             "",
             "## Operator Analysis / 算子分析",
             "",
-            "| Operator | Correctness | Avg Max Abs Error | Performance Shapes | Ratio Range |",
-            "|---|---:|---:|---:|---:|",
+            "| Operator | Correctness | Avg Max Abs Error | Performance Shapes | Ratio Range | Stage Time (s) / 阶段累计耗时 |",
+            "|---|---:|---:|---:|---:|---:|",
         ]
     )
     for operator in run.get("operators", []):
@@ -325,7 +353,8 @@ def render_markdown(run: dict[str, Any]) -> str:
             f"| {_md_cell(operator.get('operator'))} | {_fmt_correctness(operator)} | "
             f"{_fmt_scientific(operator.get('avg_max_abs_err'))} | "
             f"{operator.get('performance_cases', 0)} | "
-            f"{_fmt_range(operator.get('ratio_range'), '%', 2)} |"
+            f"{_fmt_range(operator.get('ratio_range'), '%', 2)} | "
+            f"{_fmt(operator.get('stage_duration_s_total'), 3)} |"
         )
     lines.extend(
         [
@@ -337,13 +366,13 @@ def render_markdown(run: dict[str, Any]) -> str:
         ]
     )
     perf_cases = run.get("performance", {}).get("cases", [])
-    for operator in run.get("operators", []):
+    for operator_index, operator in enumerate(run.get("operators", []), 1):
         name = operator.get("operator")
         cases = [case for case in perf_cases if case.get("operator") == name]
+        lines.extend([f"### {name}", ""])
+        lines.extend(_stage_timing_markdown(operator.get("stage_timing"), operator_index))
         lines.extend(
             [
-                f"### {name}",
-                "",
                 "| Label | Latency (us) | Ratio (%) | Shape / Parameters | DType | Mode | Kernel | Bandwidth (TB/s) |",
                 "|---|---:|---:|---|---|---|---|---:|",
             ]
@@ -459,9 +488,10 @@ def _operator_analysis_rows(run: dict[str, Any]) -> str:
             f'<td class="number">{_fmt_scientific(operator.get("avg_max_abs_err"))}</td>'
             f"<td>{operator.get('performance_cases', 0)}</td>"
             f"<td>{html.escape(_fmt_range(operator.get('ratio_range'), '%', 2))}</td>"
+            f'<td class="number">{_fmt(operator.get("stage_duration_s_total"), 3)}</td>'
             "</tr>"
         )
-    return "".join(rows) or '<tr><td colspan="6" class="empty">No operator records</td></tr>'
+    return "".join(rows) or '<tr><td colspan="7" class="empty">No operator records</td></tr>'
 
 
 def _performance_rows(cases: list[dict[str, Any]], operator_index: int) -> str:
@@ -493,7 +523,10 @@ def _case_details(cases: list[dict[str, Any]], operator_index: int) -> str:
             ("Internal case ID", case.get("case_id")),
             ("Parameters", json.dumps(params, ensure_ascii=False)),
             ("Kernel config", _display_value(case.get("config"))),
-            ("Profiler / kernel", f"{case.get('prof_mode') or 'N/A'} / {_kernel_name(case)}"),
+            (
+                "Profiler / kernel",
+                f"{case.get('prof_mode') or 'N/A'} / {_kernel_name(case)}",
+            ),
             ("AI (Ops/Byte)", _fmt(case.get("arithmetic_intensity_ops_per_byte"))),
             ("Performance (TOPS)", _fmt(case.get("performance_tops"))),
             ("Computility (TOPS)", _fmt(case.get("computility_tops"))),
@@ -530,6 +563,7 @@ def _operator_details_section(run: dict[str, Any]) -> str:
         blocks.append(
             f'<div class="operator-block" id="operator-{operator_index}">'
             f"<h4>4.{operator_index} {html.escape(str(name))}</h4>"
+            f'{_stage_timing_html(operator.get("stage_timing"), operator_index)}'
             '<div class="table-wrap"><table>'
             f"<caption>Table 4.{operator_index}. Per-shape performance results</caption>"
             "<thead><tr><th>Label</th><th>Latency (us)</th><th>Ratio</th>"
@@ -626,7 +660,6 @@ def render_html(run: dict[str, Any]) -> str:
         "{{OPERATOR_ANALYSIS_ROWS}}": _operator_analysis_rows(run),
         "{{OPERATOR_DETAILS_SECTION}}": _operator_details_section(run),
         "{{DIAGNOSTICS_SECTION}}": _alert_section(run),
-        "{{STAGE_TIMING_SECTION}}": _stage_timing_html(run),
     }
     for token, value in replacements.items():
         template = template.replace(token, value)

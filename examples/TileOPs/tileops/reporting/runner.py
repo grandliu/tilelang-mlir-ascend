@@ -168,11 +168,9 @@ def run_operator(
     if stage_timing not in {"off", "workflow"}:
         raise ValueError("stage_timing must be off or workflow")
     # Resolve before running tests so a missing source does not waste a test run.
-    resolved_timing_sources = [
-        (repo_root / source).resolve() for source in (timing_sources or [])
-    ]
+    resolved_timing_sources = list(timing_sources or [])
     if stage_timing == "workflow":
-        load_stage_timing(resolved_timing_sources)
+        load_stage_timing(resolved_timing_sources, operator=operator, base_dir=repo_root)
     resolved_test, resolved_benchmark = resolve_operator(
         operator, test_file=test_file, benchmark_file=benchmark_file
     )
@@ -294,7 +292,9 @@ def run_operator(
         operator_catalog=operator_catalog,
     )
     if stage_timing == "workflow":
-        run["stage_timing"] = load_stage_timing(resolved_timing_sources)
+        run["stage_timing"] = load_stage_timing(
+            resolved_timing_sources, operator=operator, base_dir=repo_root
+        )
     write_reports(run, run_dir)
 
     # Keep a compact machine-readable pointer for simple automation.

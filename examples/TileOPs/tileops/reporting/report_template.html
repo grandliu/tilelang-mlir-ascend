@@ -271,6 +271,10 @@
     .stage-timing summary { padding: 10px 14px; cursor: pointer; color: var(--ink); }
     .stage-timing summary strong { margin-left: 12px; }
     .stage-timing .table-wrap { margin: 0; }
+    .operator-stage-timing { margin: 10px 0 18px; border-left: 3px solid var(--accent); }
+    .operator-stage-timing > summary { padding: 10px 14px; cursor: pointer; color: var(--ink); }
+    .operator-stage-timing > summary span { margin-left: 12px; color: var(--ink-light); }
+    .operator-stage-timing > .note { margin-left: 14px; }
     @media (max-width: 760px) {
       :root { --pad-h: 20px; }
       body { padding: 0; }
@@ -314,8 +318,6 @@
     </div>
   </section>
 
-  {{STAGE_TIMING_SECTION}}
-
   {{DIAGNOSTICS_SECTION}}
 
   <section class="section">
@@ -323,7 +325,7 @@
     <div class="table-wrap">
       <table>
         <caption>Table 1. Results by operator</caption>
-        <thead><tr><th>#</th><th>Operator</th><th>Correctness</th><th>Avg Max Abs Error</th><th>Performance Shapes</th><th>Ratio Range</th></tr></thead>
+        <thead><tr><th>#</th><th>Operator</th><th>Correctness</th><th>Avg Max Abs Error</th><th>Performance Shapes</th><th>Ratio Range</th><th>Stage Time (s)<br>阶段累计耗时</th></tr></thead>
         <tbody>{{OPERATOR_ANALYSIS_ROWS}}</tbody>
       </table>
     </div>

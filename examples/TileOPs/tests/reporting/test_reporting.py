@@ -299,58 +299,178 @@ def test_workflow_stage_timing_is_optional_and_refreshable(tmp_path):
     func_dir = op_dir / "func_a"
     func_dir.mkdir(parents=True)
     (op_dir / ".task_timeline.jsonl").write_text(
-        "\n".join(json.dumps(event) for event in [
-            {"action": "start", "stage": 0, "ts": "2026-09-01T00:00:00Z"},
-            {"action": "complete", "stage": 0, "duration_s": 12.0,
-             "ts": "2026-09-01T00:00:12Z"},
-            {"action": "start", "stage": 5, "ts": "2026-09-01T00:02:00Z"},
-        ]) + "\n", encoding="utf-8",
+        "\n".join(
+            json.dumps(event)
+            for event in [
+                {"action": "start", "stage": 0, "ts": "2026-09-01T00:00:00Z"},
+                {
+                    "action": "complete",
+                    "stage": 0,
+                    "duration_s": 12.0,
+                    "ts": "2026-09-01T00:00:12Z",
+                },
+                {"action": "start", "stage": 5, "ts": "2026-09-01T00:02:00Z"},
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
     )
     (func_dir / ".task_timeline.jsonl").write_text(
-        "\n".join(json.dumps(event) for event in [
-            {"action": "start", "stage": 1, "ts": "2026-09-01T00:00:20Z"},
-            {"action": "fail", "stage": 1, "duration_s": 20.0,
-             "verdict": "runtime", "ts": "2026-09-01T00:00:40Z"},
-            {"action": "start", "stage": 1, "ts": "2026-09-01T00:00:50Z"},
-            {"action": "complete", "stage": 1, "duration_s": 30.0,
-             "ts": "2026-09-01T00:01:20Z"},
-        ]) + "\n", encoding="utf-8",
+        "\n".join(
+            json.dumps(event)
+            for event in [
+                {"action": "start", "stage": 1, "ts": "2026-09-01T00:00:20Z"},
+                {
+                    "action": "fail",
+                    "stage": 1,
+                    "duration_s": 20.0,
+                    "verdict": "runtime",
+                    "ts": "2026-09-01T00:00:40Z",
+                },
+                {"action": "start", "stage": 1, "ts": "2026-09-01T00:00:50Z"},
+                {
+                    "action": "complete",
+                    "stage": 1,
+                    "duration_s": 30.0,
+                    "ts": "2026-09-01T00:01:20Z",
+                },
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
     )
     sources = [str(op_dir), str(func_dir)]
     timing = load_stage_timing(sources)
+    assert timing["duration_s_total"] == 62.0
     assert [(row["stage"], row["duration_s_total"]) for row in timing["stages"]] == [
-        (0, 12.0), (1, 50.0), (5, None)
+        (0, 12.0),
+        (1, 50.0),
+        (5, None),
     ]
     assert [item["outcome"] for item in timing["stages"][1]["attempts"]] == [
-        "failed", "completed"
+        "failed",
+        "completed",
     ]
 
-    run = {"operator": "DemoOp", "status": "passed", "summary": {},
-           "correctness": {"cases": []}, "performance": {"cases": []}}
+    run = {
+        "operator": "DemoOp",
+        "status": "passed",
+        "summary": {},
+        "correctness": {"cases": []},
+        "performance": {"cases": []},
+    }
     report_dir = tmp_path / "report"
     paths = write_reports(run, report_dir)
     assert "Workflow Stage Timing" not in paths["markdown"].read_text(encoding="utf-8")
     assert "Workflow Stage Timing" not in paths["html"].read_text(encoding="utf-8")
     assert "stage_timing" not in json.loads(paths["json"].read_text(encoding="utf-8"))
 
-    assert main(["render", str(paths["json"]), "--stage-timing", "workflow",
-                 "--timing-source", sources[0], "--timing-source", sources[1]]) == 0
+    assert (
+        main(
+            [
+                "render",
+                str(paths["json"]),
+                "--stage-timing",
+                "workflow",
+                "--timing-source",
+                sources[0],
+                "--timing-source",
+                sources[1],
+            ]
+        )
+        == 0
+    )
     markdown = paths["markdown"].read_text(encoding="utf-8")
     html = paths["html"].read_text(encoding="utf-8")
     assert "Stage 1" in markdown and "50.000" in markdown
-    assert '<details class="stage-timing" id="stage-timing-1">' in html
+    assert "Stage Time (s)" in markdown and "62.000" in markdown
+    assert '<details class="operator-stage-timing">' in html
+    assert '<details class="stage-timing" id="operator-1-stage-timing-1">' in html
     assert "runtime" in html
 
     with (op_dir / ".task_timeline.jsonl").open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps({"action": "complete", "stage": 5,
-                                 "duration_s": 65.0, "ts": "2026-09-01T00:03:05Z"}) + "\n")
-    assert main(["render", str(paths["json"]), "--stage-timing", "workflow",
-                 "--timing-source", sources[0], "--timing-source", sources[1]]) == 0
+        stream.write(
+            json.dumps(
+                {
+                    "action": "complete",
+                    "stage": 5,
+                    "duration_s": 65.0,
+                    "ts": "2026-09-01T00:03:05Z",
+                }
+            )
+            + "\n"
+        )
+    assert (
+        main(
+            [
+                "render",
+                str(paths["json"]),
+                "--stage-timing",
+                "workflow",
+                "--timing-source",
+                sources[0],
+                "--timing-source",
+                sources[1],
+            ]
+        )
+        == 0
+    )
     refreshed = json.loads(paths["json"].read_text(encoding="utf-8"))
+    assert refreshed["stage_timing"]["duration_s_total"] == 127.0
     assert refreshed["stage_timing"]["stages"][-1]["duration_s_total"] == 65.0
     assert main(["render", str(paths["json"]), "--stage-timing", "off"]) == 0
     assert "stage_timing" not in json.loads(paths["json"].read_text(encoding="utf-8"))
     assert "Workflow Stage Timing" not in paths["html"].read_text(encoding="utf-8")
+
+
+def test_multi_operator_stage_timing_is_grouped_per_operator(tmp_path):
+    from tileops.reporting.report import write_reports
+    from tileops.reporting.stage_timing import load_stage_timing
+
+    sources = []
+    for operator, duration in (("FirstOp", 10.0), ("SecondOp", 25.0)):
+        source = tmp_path / operator
+        source.mkdir()
+        (source / ".task_timeline.jsonl").write_text(
+            json.dumps(
+                {
+                    "action": "complete",
+                    "stage": 3,
+                    "duration_s": duration,
+                    "ts": "2026-09-01T00:00:30Z",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        sources.append(f"{operator}={source}")
+
+    timing = load_stage_timing(sources, operator="all")
+    assert {item["operator"]: item["duration_s_total"] for item in timing["operators"]} == {
+        "FirstOp": 10.0,
+        "SecondOp": 25.0,
+    }
+
+    run = {
+        "operator": "all",
+        "status": "passed",
+        "summary": {},
+        "correctness": {"cases": []},
+        "performance": {"cases": []},
+        "operators": [
+            {"operator": "FirstOp", "performance_cases": 0},
+            {"operator": "SecondOp", "performance_cases": 0},
+        ],
+        "stage_timing": timing,
+    }
+    paths = write_reports(run, tmp_path / "report")
+    markdown = paths["markdown"].read_text(encoding="utf-8")
+    html = paths["html"].read_text(encoding="utf-8")
+    assert "| FirstOp |" in markdown and "10.000" in markdown
+    assert "| SecondOp |" in markdown and "25.000" in markdown
+    assert html.count('<details class="operator-stage-timing">') == 2
+    assert "operator-1-stage-timing-3" in html
+    assert "operator-2-stage-timing-3" in html
 
 
 def test_runner_gates_benchmark_and_writes_report(tmp_path, monkeypatch):
@@ -359,8 +479,16 @@ def test_runner_gates_benchmark_and_writes_report(tmp_path, monkeypatch):
     timing_dir = tmp_path / "workflow"
     timing_dir.mkdir()
     (timing_dir / ".task_timeline.jsonl").write_text(
-        json.dumps({"action": "complete", "stage": 3, "duration_s": 7.0,
-                    "ts": "2026-09-01T00:00:07Z"}) + "\n", encoding="utf-8"
+        json.dumps(
+            {
+                "action": "complete",
+                "stage": 3,
+                "duration_s": 7.0,
+                "ts": "2026-09-01T00:00:07Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
     )
     calls = []
 
@@ -418,6 +546,8 @@ def test_runner_gates_benchmark_and_writes_report(tmp_path, monkeypatch):
     assert run["summary"]["benchmark_failed"] == 0
     assert (run_dir / "run.json").is_file()
     assert (run_dir / "report.md").is_file()
+    assert run["stage_timing"]["duration_s_total"] == 7.0
+    assert run["stage_timing"]["operators"][0]["operator"] == "ExternalOp"
     assert run["stage_timing"]["stages"][0]["duration_s_total"] == 7.0
 
 
