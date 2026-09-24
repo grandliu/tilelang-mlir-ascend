@@ -72,6 +72,35 @@ harness 迁移**不询问调优、不进入 Stage 4**（bench 由 Stage 5 仅报
   - `INTEGRATE_COMPLETED` → `complete_stage(5)` → `phase=DONE`（harness 迁移不询问调优；最终报告附本次 report 路径、bench 状态与有效数值，以及"可另起 optimize 场景"提示）
   - `[INTEGRATE_FAIL]` → `fail_stage(5)` → 重新调度 integrator 传入 `last_failure_summary`（`stage_retry_count[5]` 上限 2；integrator 内部已有 5 次调试闭环，两级预算独立）；超限 → `phase=FAILED`、`failure_reason=BLOCKED_INTEGRATION`
   - `[DESIGN_ERROR]` → 设计修订循环路径 B：对**失败根因指向的函数**备份其 `DESIGN.md` → `retry_count += 1` → 该函数重跑 Stage 1→2→3 → 通过后**重新执行 Stage 5**（全量重集成，集成脚本幂等）
+- **Stage 5 终态后置钩子**：Stage 5 进入 `DONE`，或因 Stage 5 重试耗尽进入 `FAILED` 后，必须先按主文件「自进化机制」的 Session 耗时分析 prompt 生成 `examples/{op_slug}/SESSION_TIMING_ANALYSIS.md`，再重新渲染报告并开始终态蒸馏；该钩子不是新 Stage，不修改 Stage 状态。
+
+### 7.1 Stage 5 后 Session 耗时分析 prompt（必执行）
+
+Stage 5 进入上述终态后，在重新渲染 TileOPs report、终态蒸馏和最终报告之前，由 conductor 在当前 Primary 会话执行以下 prompt。该环节不调用算子 Subagent；写入此文件是 conductor「禁止自行编辑算子工件」的显式例外。
+
+```text
+在这个 session 的执行过程中，基于 OpenCode 自己的日志分析：
+
+1. 整个过程耗时多久？
+2. 对耗时进行细分。
+3. 给出减少耗时的方案。
+4. 将上面问题的回答输出到：
+   examples/{op_slug}/SESSION_TIMING_ANALYSIS.md
+```
+
+执行要求：
+
+1. 只使用**当前任务对应的 OpenCode session 自身日志**作为时间事实源；统计区间从本任务首次执行活动到 Stage 5 终态信号。不得用新增 Stage/Phase 埋点替代 OpenCode 日志，不得混入其他 session。
+2. Markdown 必须写明日志来源或 session 标识、开始/结束时间、总耗时、主要环节耗时与占比、减少耗时方案。日志不能证实的值写 `N/A`，不得估造；即使日志缺失也要生成文件并说明缺失原因。
+3. Markdown 顶部须包含以下机器可读块，供报告渲染器提取；`total_duration_s` 无法确认时为 `null`，`breakdown` 无法确认时为空数组。自然语言分析写在该块之后。
+
+```text
+<!-- TILEOPS_SESSION_TIMING_V1
+{"schema_version":1,"operator":"{op_name}","total_duration_s":0.0,"breakdown":[{"name":"环节名","duration_s":0.0,"ratio_percent":0.0,"detail":"日志证据摘要"}]}
+-->
+```
+
+4. `breakdown` 只保留对理解总耗时有用的主要环节，避免把报告扩展成逐事件流水账；减少耗时方案留在 Markdown 正文，报告只展示总耗时和上述时间明细。
 
 ## 8. harness 设计修订特例
 
@@ -85,6 +114,7 @@ harness 迁移**不询问调优、不进入 Stage 4**（bench 由 Stage 5 仅报
 examples/{op_slug}/               # op 级目录（project = op_slug）
 ├── .migration_state.json         # conductor 维护的多函数聚合状态
 ├── RETROSPECTIVE.md              # Stage 5 集成复盘（op 级单份，自进化钩子）
+├── SESSION_TIMING_ANALYSIS.md     # Stage 5 后基于当前 OpenCode session 日志生成的耗时分析
 └── {func}/                       # 每个提取函数一个算子目录（结构同主文件标准目录，无 Stage 4；含函数级 RETROSPECTIVE.md）
 
 examples/TileOPs/                              # 集成侧
@@ -113,6 +143,7 @@ examples/TileOPs/                              # 集成侧
 | TileOPs 7 文件脚手架 | Stage 0 | Stage 1（规格来源）、Stage 5（集成目标） | manifest workloads、wrapper/Kernel class、test/bench 路径 |
 | `.migration_meta.json` | Stage 0 | conductor（函数循环）、Stage 5（集成参数与单算子 report 核对） | manifest `op_name`、op_slug / family / extracted_functions / wrapper_path / test_path / bench_path |
 | `.migration_state.json` | conductor | conductor | 多函数聚合状态（见 §4） |
+| `SESSION_TIMING_ANALYSIS.md` | conductor（Stage 5 后置 prompt） | TileOPs report、evolver | 当前 session 总耗时、耗时细分、减少耗时方案及机器可读摘要 |
 | `{op_slug}_kernel/`（集成包） | Stage 5 | 用户、TileOPs 框架 | 集成 kernel 文件 + `{func}_DESIGN.md` 设计文档快照 + 聚合 `__init__.py` + `integration_log.md` + `integration_report.json` |
 
 ## 10. 带记忆重试与 session 教训传递（harness 专属）
