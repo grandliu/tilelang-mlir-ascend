@@ -75,7 +75,7 @@ def test_analyzer_preserves_per_shape_roofline_ratio():
             {
                 "operator": "DemoOp",
                 "case_id": "case-1",
-                "label": "smoke-16",
+                "label": "full-16",
                 "tag": "tileops",
                 "params": {"shape": [16], "dtype": "float16"},
                 "result": {
@@ -105,7 +105,7 @@ def test_analyzer_preserves_per_shape_roofline_ratio():
 
     case = run["performance"]["cases"][0]
     assert case["roofline_utilization_percent"] == 62.5
-    assert case["label"] == "smoke-16"
+    assert case["label"] == "full-16"
     assert "baselines" not in case
     assert "average_roofline_utilization_percent" not in run["summary"]
     assert "speedup_range" not in run["operators"][0]
@@ -145,6 +145,50 @@ def test_analyzer_rejects_candidate_profiler_fallback():
     assert run["status"] == "partial"
     assert run["summary"]["profiler_fallback_count"] == 1
     assert "baselines" not in run["performance"]["cases"][0]
+
+
+def test_analyzer_excludes_legacy_smoke_performance_records():
+    benchmark = {
+        "status": "present",
+        "profiling_mode_requested": "msprof",
+        "records": [
+            {
+                "operator": "DemoOp",
+                "case_id": "smoke-case",
+                "label": "demo-smoke",
+                "tag": "tileops",
+                "params": {},
+                "result": {"latency_us": 1.0, "prof_mode": "msprof"},
+            },
+            {
+                "operator": "DemoOp",
+                "case_id": "full-case",
+                "label": "demo-full",
+                "tag": "tileops",
+                "params": {},
+                "result": {"latency_us": 2.0, "prof_mode": "msprof"},
+            },
+        ],
+    }
+    correctness = {
+        "status": "passed",
+        "tests": 1,
+        "passed": 1,
+        "failed": 0,
+        "errors": 0,
+        "cases": [],
+    }
+
+    run = analyze_run(
+        operator="DemoOp",
+        correctness=correctness,
+        correctness_exit_code=0,
+        benchmark=benchmark,
+        benchmark_exit_code=0,
+    )
+
+    assert run["summary"]["case_count"] == 1
+    assert [case["label"] for case in run["performance"]["cases"]] == ["demo-full"]
 
 
 def test_benchmark_report_writes_structured_json(tmp_path, monkeypatch):
@@ -238,7 +282,7 @@ def test_write_reports_creates_all_formats(tmp_path):
                 {
                     "operator": "DemoOp",
                     "case_id": "DemoOp-0123456789ab",
-                    "label": "smoke-16x32",
+                    "label": "full-16x32",
                     "params": {"shape": [16, 32], "dtype": "float16"},
                     "prof_mode": "msprof",
                     "latency_us": 8.5,
@@ -271,7 +315,7 @@ def test_write_reports_creates_all_formats(tmp_path):
     assert "N/Ax" not in markdown
     assert "Shape / Parameters" in html
     assert "<th>Label</th><th>Latency (us)</th><th>Ratio</th>" in html
-    assert "smoke-16x32" in html
+    assert "full-16x32" in html
     assert "[16, 32]" in html
     assert "<th>Operator</th><th>Correctness</th><th>Avg Max Abs Error</th>" in html
     assert "100.0% (1/1)" in html
@@ -297,7 +341,7 @@ def test_runner_gates_benchmark_and_writes_report(tmp_path, monkeypatch):
 
     def fake_run_pytest(**kwargs):
         target = kwargs["target"]
-        calls.append(target)
+        calls.append((target, kwargs["pytest_args"]))
         Path(kwargs["junit_path"]).write_text(
             '<testsuite tests="1"><testcase classname="demo" name="ok"/></testsuite>',
             encoding="utf-8",
@@ -340,7 +384,10 @@ def test_runner_gates_benchmark_and_writes_report(tmp_path, monkeypatch):
         root=tmp_path,
     )
 
-    assert calls == ["test_demo.py", "bench_demo.py"]
+    assert calls == [
+        ("test_demo.py", []),
+        ("bench_demo.py", ["-m", "not smoke"]),
+    ]
     assert exit_code == 0
     assert run["status"] == "passed"
     assert run["summary"]["benchmark_tests"] == 1
@@ -377,6 +424,58 @@ def test_runner_skips_benchmark_after_correctness_failure(tmp_path, monkeypatch)
     assert exit_code == 1
     assert run["status"] == "failed"
     assert run["summary"]["benchmark_requested"] is False
+
+
+def test_runner_combines_user_marker_expression_with_smoke_exclusion(tmp_path, monkeypatch):
+    (tmp_path / "test_demo.py").write_text("", encoding="utf-8")
+    (tmp_path / "bench_demo.py").write_text("", encoding="utf-8")
+    calls = []
+
+    def fake_run_pytest(**kwargs):
+        calls.append((kwargs["target"], kwargs["pytest_args"]))
+        Path(kwargs["junit_path"]).write_text(
+            '<testsuite tests="1"><testcase classname="demo" name="ok"/></testsuite>',
+            encoding="utf-8",
+        )
+        if kwargs["target"] == "bench_demo.py":
+            Path(kwargs["env"]["TILEOPS_BENCHMARK_REPORT_PATH"]).with_suffix(
+                ".json"
+            ).write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "profiling_mode_requested": "events",
+                        "records": [
+                            {
+                                "operator": "ExternalOp",
+                                "case_id": "case-1",
+                                "label": "full-case",
+                                "tag": "tileops",
+                                "params": {},
+                                "result": {"latency_us": 1.0, "prof_mode": "events"},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+        return 0, ["pytest", kwargs["target"]]
+
+    monkeypatch.setattr("tileops.reporting.runner._run_pytest", fake_run_pytest)
+
+    run_operator(
+        "ExternalOp",
+        test_file="test_demo.py",
+        benchmark_file="bench_demo.py",
+        prof_mode="events",
+        pytest_args=["-m", "full or nightly", "-q"],
+        root=tmp_path,
+    )
+
+    assert calls == [
+        ("test_demo.py", ["-m", "full or nightly", "-q"]),
+        ("bench_demo.py", ["-q", "-m", "(full or nightly) and not smoke"]),
+    ]
 
 
 def test_all_mode_resolves_pytest_directories():

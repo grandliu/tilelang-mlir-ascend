@@ -95,6 +95,31 @@ def _reject_xdist(pytest_args: list[str], pytest_addopts: str | None) -> None:
             )
 
 
+def _exclude_smoke(pytest_args: list[str]) -> list[str]:
+    """Return benchmark-only pytest args with smoke cases excluded."""
+    remaining: list[str] = []
+    expressions: list[str] = []
+    index = 0
+    while index < len(pytest_args):
+        arg = pytest_args[index]
+        if arg in {"-m", "--markexpr"}:
+            if index + 1 >= len(pytest_args):
+                raise ValueError(f"{arg} requires a marker expression")
+            expressions.append(pytest_args[index + 1])
+            index += 2
+            continue
+        if arg.startswith("--markexpr=") or arg.startswith("-m="):
+            expressions.append(arg.split("=", 1)[1])
+            index += 1
+            continue
+        remaining.append(arg)
+        index += 1
+
+    expression = " and ".join(f"({item})" for item in expressions if item.strip())
+    expression = f"{expression} and not smoke" if expression else "not smoke"
+    return [*remaining, "-m", expression]
+
+
 def _git_commit(root: Path) -> str | None:
     try:
         result = subprocess.run(
@@ -231,7 +256,7 @@ def run_operator(
             junit_path=benchmark_xml,
             log_path=pytest_dir / "benchmark.log",
             env=benchmark_env,
-            pytest_args=args,
+            pytest_args=_exclude_smoke(args),
             timeout=timeout,
         )
         benchmark_tests = parse_junit_report(benchmark_xml)
