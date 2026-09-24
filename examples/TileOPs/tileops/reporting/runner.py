@@ -17,6 +17,7 @@ from tileops.manifest import load_manifest
 from tileops.reporting.analyzer import analyze_run
 from tileops.reporting.collector import load_benchmark_report, parse_junit_report
 from tileops.reporting.report import write_reports
+from tileops.reporting.session_timing import attach_session_timing
 from tileops.reporting.setup_info import collect_setup_info
 
 
@@ -37,6 +38,7 @@ def list_operators() -> list[dict[str, Any]]:
                 "status": entry.get("status"),
                 "test": source.get("test"),
                 "benchmark": source.get("bench"),
+                "kernel": source.get("kernel"),
             }
         )
     return operators
@@ -184,6 +186,7 @@ def run_operator(
     pytest_args: list[str] | None = None,
     timeout: int | None = None,
     root: str | Path | None = None,
+    with_session_timing: bool = False,
 ) -> tuple[dict[str, Any], Path, int]:
     """Run correctness then benchmark, and emit one self-contained report directory."""
     repo_root = Path(root).resolve() if root else project_root()
@@ -306,6 +309,12 @@ def run_operator(
         metadata=metadata,
         setup=setup,
         operator_catalog=operator_catalog,
+    )
+    attach_session_timing(
+        run,
+        root=repo_root,
+        operator_catalog=operator_catalog,
+        enabled=with_session_timing,
     )
     write_reports(run, run_dir)
 

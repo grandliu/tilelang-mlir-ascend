@@ -4,9 +4,11 @@ from pathlib import Path
 from tileops.benchmark.benchmark_base import BenchmarkReport
 from tileops.benchmark.msprof import _parse_op_basic_info
 from tileops.reporting.analyzer import analyze_run
+from tileops.reporting.cli import _parser
 from tileops.reporting.collector import parse_junit_report
 from tileops.reporting.report import write_reports
 from tileops.reporting.runner import resolve_operator, run_operator
+from tileops.reporting.session_timing import attach_session_timing, parse_session_timing
 
 
 def test_parse_junit_report_preserves_properties(tmp_path):
@@ -646,3 +648,194 @@ def test_benchmark_failures_are_preserved_in_diagnostics(tmp_path):
     assert run["status"] == "partial"
     assert "Benchmark" in html
     assert "device error" in html
+
+
+def _write_session_timing(path: Path, operator: str, total: float = 3661.25):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "<!-- TILEOPS_SESSION_TIMING_V1",
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "operator": operator,
+                        "total_duration_s": total,
+                        "breakdown": [
+                            {
+                                "name": "Stage 5 integration",
+                                "duration_s": 61.25,
+                                "ratio_percent": 1.67,
+                                "detail": "OpenCode session log",
+                            }
+                        ],
+                    }
+                ),
+                "-->",
+                "# Session timing analysis",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_parse_session_timing_validates_operator_and_values(tmp_path):
+    source = tmp_path / "SESSION_TIMING_ANALYSIS.md"
+    _write_session_timing(source, "DemoOp")
+
+    parsed = parse_session_timing(source, "DemoOp")
+    mismatch = parse_session_timing(source, "OtherOp")
+
+    assert parsed["status"] == "available"
+    assert parsed["total_duration_s"] == 3661.25
+    assert parsed["breakdown"][0]["name"] == "Stage 5 integration"
+    assert mismatch["status"] == "invalid"
+    assert "operator mismatch" in mismatch["reason"]
+
+
+def test_session_timing_auto_discovery_supports_multi_operator_reports(tmp_path):
+    root = tmp_path / "TileOPs"
+    root.mkdir()
+    metadata = root / "tileops" / "kernels" / "demo" / "alpha" / ".migration_meta.json"
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text(
+        json.dumps({"op_name": "AlphaOp", "op_slug": "alpha_task"}), encoding="utf-8"
+    )
+    _write_session_timing(
+        tmp_path / "alpha_task" / "SESSION_TIMING_ANALYSIS.md", "AlphaOp"
+    )
+    run = {
+        "operators": [{"operator": "AlphaOp"}, {"operator": "BetaOp"}],
+    }
+    catalog = [
+        {"name": "AlphaOp", "kernel": "tileops/kernels/demo/wrong/wrong.py"},
+        {"name": "BetaOp", "kernel": "tileops/kernels/demo/beta/beta.py"},
+    ]
+
+    attach_session_timing(run, root=root, operator_catalog=catalog, enabled=True)
+
+    records = run["session_timing"]["operators"]
+    assert records["AlphaOp"]["status"] == "available"
+    assert records["BetaOp"]["status"] == "missing"
+    assert records["BetaOp"]["total_duration_s"] is None
+
+
+def test_optional_session_timing_rendering_and_na_fallback(tmp_path):
+    run = {
+        "operator": "all",
+        "status": "passed",
+        "metadata": {},
+        "setup": {},
+        "summary": {
+            "operator_count": 2,
+            "total_cases": 0,
+            "passed_cases": 0,
+            "failed_cases": 0,
+            "case_count": 0,
+        },
+        "operators": [
+            {
+                "operator": "AlphaOp",
+                "cases": 0,
+                "passed": 0,
+                "pass_rate": None,
+                "performance_cases": 0,
+            },
+            {
+                "operator": "BetaOp",
+                "cases": 0,
+                "passed": 0,
+                "pass_rate": None,
+                "performance_cases": 0,
+            },
+        ],
+        "performance": {"cases": []},
+        "correctness": {"cases": []},
+        "benchmark_tests": {"cases": []},
+        "warnings": [],
+        "session_timing": {
+            "enabled": True,
+            "operators": {
+                "AlphaOp": {
+                    "status": "available",
+                    "total_duration_s": 3661.25,
+                    "breakdown": [
+                        {
+                            "name": "Integration",
+                            "duration_s": 61.25,
+                            "ratio_percent": 1.67,
+                            "detail": "session log",
+                        }
+                    ],
+                },
+                "BetaOp": {
+                    "status": "missing",
+                    "total_duration_s": None,
+                    "breakdown": [],
+                    "reason": "SESSION_TIMING_ANALYSIS.md not found",
+                },
+            },
+        },
+    }
+
+    paths = write_reports(run, tmp_path)
+    markdown = paths["markdown"].read_text(encoding="utf-8")
+    html = paths["html"].read_text(encoding="utf-8")
+
+    assert "| Operator | Total Time |" in markdown
+    assert "1h01m01s" in markdown
+    assert "Timing data unavailable: SESSION_TIMING_ANALYSIS.md not found" in markdown
+    assert "Total Time / 总时间" in html
+    assert "Session Timing / Session 耗时" in html
+    assert "1h01m01s" in html
+    assert "SESSION_TIMING_ANALYSIS.md not found" in html
+
+
+def test_session_timing_disabled_preserves_current_report_layout(tmp_path):
+    run = {
+        "operator": "DemoOp",
+        "status": "passed",
+        "metadata": {},
+        "setup": {},
+        "summary": {
+            "operator_count": 1,
+            "total_cases": 0,
+            "passed_cases": 0,
+            "failed_cases": 0,
+            "case_count": 0,
+        },
+        "operators": [
+            {
+                "operator": "DemoOp",
+                "cases": 0,
+                "passed": 0,
+                "pass_rate": None,
+                "performance_cases": 0,
+            }
+        ],
+        "performance": {"cases": []},
+        "correctness": {"cases": []},
+        "benchmark_tests": {"cases": []},
+        "warnings": [],
+    }
+
+    paths = write_reports(run, tmp_path)
+    markdown = paths["markdown"].read_text(encoding="utf-8")
+    html = paths["html"].read_text(encoding="utf-8")
+
+    assert "Total Time" not in markdown
+    assert "Session Timing" not in markdown
+    assert "Total Time / 总时间" not in html
+    assert "Session Timing / Session 耗时" not in html
+
+
+def test_session_timing_flag_is_available_for_run_and_render():
+    parser = _parser()
+
+    run_args = parser.parse_args(["run", "--all", "--with-session-timing"])
+    render_args = parser.parse_args(
+        ["render", "reports/tileops/demo/run.json", "--with-session-timing"]
+    )
+
+    assert run_args.with_session_timing is True
+    assert render_args.with_session_timing is True

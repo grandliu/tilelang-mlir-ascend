@@ -101,6 +101,7 @@ Stage 5 进入上述终态后，在重新渲染 TileOPs report、终态蒸馏和
 ```
 
 4. `breakdown` 只保留对理解总耗时有用的主要环节，避免把报告扩展成逐事件流水账；减少耗时方案留在 Markdown 正文，报告只展示总耗时和上述时间明细。
+5. Markdown 写入成功后，从集成包的 `integration_report.json` 读取本次 `run.json` 仓库相对路径；文件有效时从 `examples/TileOPs/` 执行 `python -m tileops.reporting.cli render {run_json} --with-session-timing`，原地更新该 run 的 `run.json` / `report.md` / `report.html`，**不得重跑 correctness 或 benchmark**。`run.json` 缺失或无效时不伪造报告，最终汇报披露无法重渲染，然后仍将 Markdown 交给 evolver。
 
 ## 8. harness 设计修订特例
 
