@@ -114,6 +114,56 @@ def test_analyzer_preserves_per_shape_roofline_ratio():
     assert run["operators"][0]["ratio_range"] == {"min": 62.5, "max": 62.5}
 
 
+def test_analyzer_ignores_non_tileops_performance_records():
+    benchmark = {
+        "status": "present",
+        "profiling_mode_requested": "msprof",
+        "records": [
+            {
+                "operator": "DemoOp",
+                "case_id": "tileops-case",
+                "label": "full-16",
+                "tag": "tileops",
+                "params": {"shape": [16], "dtype": "float16"},
+                "result": {"latency_us": 10.0, "prof_mode": "msprof"},
+            },
+            {
+                "operator": "DemoOp",
+                "case_id": "torch-case-with-different-params-hash",
+                "label": "full-16",
+                "tag": "torch",
+                "params": {
+                    "shape": [16],
+                    "dtype": "float16",
+                    "result_bl": {"latency_us": 8.0},
+                },
+                "result": {"latency_us": 8.0, "prof_mode": "events"},
+            },
+        ],
+    }
+    correctness = {
+        "status": "passed",
+        "tests": 1,
+        "passed": 1,
+        "failed": 0,
+        "errors": 0,
+        "cases": [],
+    }
+
+    run = analyze_run(
+        operator="DemoOp",
+        correctness=correctness,
+        correctness_exit_code=0,
+        benchmark=benchmark,
+        benchmark_exit_code=0,
+    )
+
+    assert run["status"] == "passed"
+    assert run["summary"]["case_count"] == 1
+    assert [case["case_id"] for case in run["performance"]["cases"]] == ["tileops-case"]
+    assert not any("missing tileops candidate record" in warning for warning in run["warnings"])
+
+
 def test_analyzer_rejects_candidate_profiler_fallback():
     benchmark = {
         "status": "present",

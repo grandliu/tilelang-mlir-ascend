@@ -39,6 +39,8 @@ def _analyze_performance(benchmark: dict[str, Any]) -> tuple[list[dict], dict, l
     requested_mode = benchmark.get("profiling_mode_requested")
     grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for record in benchmark.get("records", []):
+        if not str(record.get("tag", "")).startswith("tileops"):
+            continue
         grouped[(record.get("operator", "unknown"), record.get("case_id", "unknown"))].append(
             record
         )
