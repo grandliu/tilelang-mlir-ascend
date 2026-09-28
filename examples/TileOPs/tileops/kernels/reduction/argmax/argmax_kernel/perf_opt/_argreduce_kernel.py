@@ -160,9 +160,7 @@ def _select_config(M, N, dtype):
 
     # Basic ladder {1,2,4,8} (p=1 uses B_bm1 to account for ext_brc).
     candidates = [
-        p
-        for p in (1, 2, 4, 8)
-        if p * N * (B_bm1 if p == 1 else B_multi) <= UB_MANUAL_BUDGET
+        p for p in (1, 2, 4, 8) if p * N * (B_bm1 if p == 1 else B_multi) <= UB_MANUAL_BUDGET
     ]
     block_m = max(candidates) if candidates else None
 
@@ -181,11 +179,7 @@ def _select_config(M, N, dtype):
         # vs 192KB UB). Divide the narrow-N extended-ladder budget by 3 so the
         # ladder lands at bm=512 (34KB manual -> ~105KB actual).
         ext_budget = UB_MANUAL_BUDGET if N >= TILE_ALIGNMENT else UB_MANUAL_BUDGET // 3
-        ext = [
-            p
-            for p in (16, 32, 64, 128, 256, 512, 1024, 2048)
-            if p * N * B_multi <= ext_budget
-        ]
+        ext = [p for p in (16, 32, 64, 128, 256, 512, 1024, 2048) if p * N * B_multi <= ext_budget]
         block_m = max(ext + [block_m])
 
     if block_m is None:
@@ -198,8 +192,13 @@ def _select_config(M, N, dtype):
     # the plain resident path when the shape fits.
     ncfg = _select_narrow(M, N, dtype)
     if ncfg is not None:
-        return {"block_m": ncfg["bw"] * ncfg["G"], "path": "narrow",
-                "tile_n": None, "G": ncfg["G"], "bw": ncfg["bw"]}
+        return {
+            "block_m": ncfg["bw"] * ncfg["G"],
+            "path": "narrow",
+            "tile_n": None,
+            "G": ncfg["G"],
+            "bw": ncfg["bw"],
+        }
     # Narrow-N correctness guard (adoption re-verification probe, 2026-09-28):
     # for N < TILE_ALIGNMENT the chain-form resident with block_m > 1 and the
     # tiled path (both prim_func variants) silently corrupt a data-dependent
@@ -709,9 +708,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                         )
                                     T.reduce_min(cand, chunk_first, dim=1)
                                     for i in T.Parallel(block_m):
-                                        chunk_global[i, 0] = T.cast(
-                                            (t + 1) * tile_n, "float32"
-                                        ) + chunk_first[i, 0]
+                                        chunk_global[i, 0] = (
+                                            T.cast((t + 1) * tile_n, "float32") + chunk_first[i, 0]
+                                        )
                                     if op_kind == "argmax":
                                         T.vcmp(chunk_ext, running_ext, cond, "gt")
                                     else:
@@ -745,9 +744,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                     )
                                 T.reduce_min(cand_tail, tail_first, dim=1)
                                 for i in T.Parallel(block_m):
-                                    tail_global[i, 0] = T.cast(
-                                        num_full * tile_n, "float32"
-                                    ) + tail_first[i, 0]
+                                    tail_global[i, 0] = (
+                                        T.cast(num_full * tile_n, "float32") + tail_first[i, 0]
+                                    )
                                 if op_kind == "argmax":
                                     T.vcmp(tail_ext, running_ext, cond_tail, "gt")
                                 else:
@@ -832,9 +831,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                         )
                                     T.reduce_min(cand, chunk_first, dim=1)
                                     for i in T.Parallel(block_m):
-                                        chunk_global[i, 0] = T.cast(
-                                            (t + 1) * tile_n, "float32"
-                                        ) + chunk_first[i, 0]
+                                        chunk_global[i, 0] = (
+                                            T.cast((t + 1) * tile_n, "float32") + chunk_first[i, 0]
+                                        )
                                     if op_kind == "argmax":
                                         T.vcmp(chunk_ext, running_ext, cond, "gt")
                                     else:
@@ -868,9 +867,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                     )
                                 T.reduce_min(cand_tail, tail_first, dim=1)
                                 for i in T.Parallel(block_m):
-                                    tail_global[i, 0] = T.cast(
-                                        num_full * tile_n, "float32"
-                                    ) + tail_first[i, 0]
+                                    tail_global[i, 0] = (
+                                        T.cast(num_full * tile_n, "float32") + tail_first[i, 0]
+                                    )
                                 if op_kind == "argmax":
                                     T.vcmp(tail_ext, running_ext, cond_tail, "gt")
                                 else:
@@ -900,8 +899,7 @@ def _build_nsplit_dispatch(M, N, op_kind, dtype, work_dtype, vector_cores, tn, n
     launches partial then merge (prev-task round9 form: harness bench +
     golden PASS proven; the wrapper still sees a single callable).
     """
-    partial = _build_nsplit_partial(
-        M, N, op_kind, dtype, work_dtype, vector_cores, tn, nchunk)(M)
+    partial = _build_nsplit_partial(M, N, op_kind, dtype, work_dtype, vector_cores, tn, nchunk)(M)
     merge = _build_nsplit_merge(M, N, op_kind, dtype, work_dtype, tn, nchunk)()
     ws_elems = nchunk * M
     val_torch_dtype = _DTYPE_MAP[work_dtype]
@@ -929,9 +927,7 @@ def _argreduce_kernel(M, N, op_kind, dtype):
     UB-budget-driven block_m / tile_n (DESIGN.md sections 5.2 / 5.5).
     """
     if op_kind not in _KINDS:
-        raise ValueError(
-            f"unsupported op_kind {op_kind!r}; expected one of {sorted(_KINDS)}"
-        )
+        raise ValueError(f"unsupported op_kind {op_kind!r}; expected one of {sorted(_KINDS)}")
     if dtype not in _SUPPORTED_DTYPES:
         raise ValueError(
             f"unsupported dtype {dtype!r}; expected one of {sorted(_SUPPORTED_DTYPES)}"
@@ -949,8 +945,14 @@ def _argreduce_kernel(M, N, op_kind, dtype):
     ncfg = _nsplit_config(M, N, dtype, vector_cores)
     if ncfg is not None:
         _f = _build_nsplit_dispatch(
-            M, N, op_kind, dtype, work_dtype, vector_cores,
-            ncfg["tn"], ncfg["nchunk"],
+            M,
+            N,
+            op_kind,
+            dtype,
+            work_dtype,
+            vector_cores,
+            ncfg["tn"],
+            ncfg["nchunk"],
         )
         # msprof anchor: dual-launch dispatch -- anchor the dominant
         # partial kernel (Stage 4: partial ~8.4us + merge ~3.3us). The
@@ -961,8 +963,14 @@ def _argreduce_kernel(M, N, op_kind, dtype):
 
     if cfg["path"] == "narrow":
         _f = _build_narrow(
-            M, N, op_kind, dtype, work_dtype, vector_cores,
-            cfg["G"], cfg["bw"],
+            M,
+            N,
+            op_kind,
+            dtype,
+            work_dtype,
+            vector_cores,
+            cfg["G"],
+            cfg["bw"],
         )
         _f.msprof_kernel_name = "main"
         return _f
@@ -971,9 +979,7 @@ def _argreduce_kernel(M, N, op_kind, dtype):
         _f = _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores)
         _f.msprof_kernel_name = "main"
         return _f
-    _f = _build_tiled(
-        M, N, op_kind, dtype, work_dtype, vector_cores, cfg["tile_n"]
-    )
+    _f = _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, cfg["tile_n"])
     _f.msprof_kernel_name = "main"
     return _f
 
@@ -1032,7 +1038,14 @@ def run_L0():
         (2048, 4096, "bfloat16", "argmax", 1, None),  # L0-5a hidden-state bf16
         (2048, 4096, "float32", "argmax", 1, None),  # L0-5b hidden-state fp32
         (4096, 4, "float16", "argmax", 1024, None),  # L0-6a 3d quick regression (narrow deint path)
-        (524288, 4, "float16", "argmax", 1024, None),  # L0-6b 3d manifest true shape (narrow deint path)
+        (
+            524288,
+            4,
+            "float16",
+            "argmax",
+            1024,
+            None,
+        ),  # L0-6b 3d manifest true shape (narrow deint path)
         (128, 300, "float16", "argmax", 8, None),  # L0-7a N unaligned
         (128, 300, "bfloat16", "argmax", 8, None),  # L0-7b N unaligned bf16
         (129, 512, "float16", "argmax", 8, None),  # L0-7c M tail (129 % 8 = 1)
@@ -1186,8 +1199,7 @@ def run_boundary():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--level", default="L0",
-                        choices=["L0", "all", "nsplit"])
+    parser.add_argument("--level", default="L0", choices=["L0", "all", "nsplit"])
     args, _ = parser.parse_known_args()
     if args.level == "nsplit":
         run_nsplit_L0()
@@ -1199,8 +1211,6 @@ def main():
         run_L2()
         run_boundary()
     print("\033[92mAll check passed!\033[0m")
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -1242,7 +1252,7 @@ def _nsplit_config(M, N, dtype, vector_cores):
     B_row = {"float16": 10, "bfloat16": 14, "float32": 16}.get(dtype)
     if B_row is None:
         return None
-    if M > _NSPLIT_MAX_M or N < _NSPLIT_MIN_N or M >= vector_cores:
+    if M > _NSPLIT_MAX_M or N < _NSPLIT_MIN_N or vector_cores <= M:
         return None
     if N % 256 != 0:
         return None
@@ -1282,9 +1292,11 @@ def _build_nsplit_partial(M, N, op_kind, dtype, work_dtype, vector_cores, tn, nc
         if is_bf16:
 
             @T.prim_func
-            def argreduce_partial(x: T.Tensor((M, N), dtype),
-                                  ws_val: T.Tensor((nchunk * M,), work_dtype),
-                                  ws_idx: T.Tensor((nchunk * M,), "float32")):
+            def argreduce_partial(
+                x: T.Tensor((M, N), dtype),
+                ws_val: T.Tensor((nchunk * M,), work_dtype),
+                ws_idx: T.Tensor((nchunk * M,), "float32"),
+            ):
                 with T.Kernel(num_kernels, is_npu=True) as (cid, _):
                     x_r = T.alloc_shared((1, tn), dtype)
                     w_r = T.alloc_fragment((1, tn), "float32")
@@ -1321,9 +1333,11 @@ def _build_nsplit_partial(M, N, op_kind, dtype, work_dtype, vector_cores, tn, nc
         else:
 
             @T.prim_func
-            def argreduce_partial(x: T.Tensor((M, N), dtype),
-                                  ws_val: T.Tensor((nchunk * M,), dtype),
-                                  ws_idx: T.Tensor((nchunk * M,), "float32")):
+            def argreduce_partial(
+                x: T.Tensor((M, N), dtype),
+                ws_val: T.Tensor((nchunk * M,), dtype),
+                ws_idx: T.Tensor((nchunk * M,), "float32"),
+            ):
                 with T.Kernel(num_kernels, is_npu=True) as (cid, _):
                     x_r = T.alloc_shared((1, tn), dtype)
                     w_r = T.alloc_fragment((1, tn), dtype)
@@ -1377,9 +1391,11 @@ def _build_nsplit_merge(M, N, op_kind, dtype, work_dtype, tn, nchunk):
     def _merge():
 
         @T.prim_func
-        def argreduce_merge(ws_val: T.Tensor((nchunk, M), work_dtype),
-                            ws_idx: T.Tensor((nchunk, M), "float32"),
-                            out: T.Tensor((M,), "int64")):
+        def argreduce_merge(
+            ws_val: T.Tensor((nchunk, M), work_dtype),
+            ws_idx: T.Tensor((nchunk, M), "float32"),
+            out: T.Tensor((M,), "int64"),
+        ):
             with T.Kernel(1, is_npu=True) as (cid, _):
                 val_t = T.alloc_shared((nchunk, M), work_dtype)
                 val_s = T.alloc_shared((M, nchunk), work_dtype)
@@ -1435,8 +1451,7 @@ def build_nsplit(M, N, op_kind, dtype, tn=None):
     if N % tn != 0:
         raise ValueError(f"tn={tn} must divide N={N} (zero-tail chunking)")
     nchunk = N // tn
-    partial = _build_nsplit_partial(
-        M, N, op_kind, dtype, work_dtype, vector_cores, tn, nchunk)(M)
+    partial = _build_nsplit_partial(M, N, op_kind, dtype, work_dtype, vector_cores, tn, nchunk)(M)
     merge = _build_nsplit_merge(M, N, op_kind, dtype, work_dtype, tn, nchunk)()
 
     def launch(x, ws_val, ws_idx):
@@ -1471,15 +1486,16 @@ def run_nsplit_L0():
             v2 = 14.0 if op_kind == "argmax" else -14.0
             x = torch.zeros(4, 102400, dtype=dt, device="npu")
             x[0, 5] = v
-            x[0, 102400 - tn] = v          # duplicate extreme, late chunk -> 5
-            x[1, 102400 - tn] = v2         # extreme only in late chunk
-            x[3, tn - 1] = v               # adjacent-chunk tie -> tn-1
+            x[0, 102400 - tn] = v  # duplicate extreme, late chunk -> 5
+            x[1, 102400 - tn] = v2  # extreme only in late chunk
+            x[3, tn - 1] = v  # adjacent-chunk tie -> tn-1
             x[3, tn] = v
             y = launch(x, ws_val, ws_idx)
             ref = golden_argreduce(x.cpu(), op_kind)
             assert y.dtype == torch.int64 and torch.equal(y.cpu(), ref), (
                 f"[nsplit-L0] tie mismatch {dtype_str}/{op_kind}: "
-                f"got={y.cpu().tolist()} want={ref.tolist()}")
+                f"got={y.cpu().tolist()} want={ref.tolist()}"
+            )
             n_cases += 1
 
             # all-(extreme-unit) rows: all -inf for argmax / all +inf for argmin
@@ -1492,7 +1508,8 @@ def run_nsplit_L0():
             y2 = launch1(x2, ws_val2, ws_idx2)
             ref2 = golden_argreduce(x2.cpu(), op_kind)
             assert torch.equal(y2.cpu(), ref2), (
-                f"[nsplit-L0] all-{fill} mismatch {dtype_str}/{op_kind}")
+                f"[nsplit-L0] all-{fill} mismatch {dtype_str}/{op_kind}"
+            )
             n_cases += 1
 
             # M=1 with a cross-chunk tie.
@@ -1505,7 +1522,8 @@ def run_nsplit_L0():
             y3 = launch2(x3, ws_val3, ws_idx3)
             ref3 = golden_argreduce(x3.cpu(), op_kind)
             assert torch.equal(y3.cpu(), ref3), (
-                f"[nsplit-L0] M=1 tie mismatch {dtype_str}/{op_kind}")
+                f"[nsplit-L0] M=1 tie mismatch {dtype_str}/{op_kind}"
+            )
             n_cases += 1
 
             # randn sweeps (3 seeds).
@@ -1515,12 +1533,11 @@ def run_nsplit_L0():
                 yr = launch(xr, ws_val, ws_idx)
                 rr = golden_argreduce(xr.cpu(), op_kind)
                 assert torch.equal(yr.cpu(), rr), (
-                    f"[nsplit-L0] randn seed={seed} mismatch {dtype_str}/{op_kind}")
+                    f"[nsplit-L0] randn seed={seed} mismatch {dtype_str}/{op_kind}"
+                )
                 n_cases += 1
             print(f"[nsplit-L0] PASS: {dtype_str}/{op_kind} tn={tn} nchunk={nchunk}")
     print(f"[nsplit-L0] ALL PASS: {n_cases} cases")
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -1535,29 +1552,45 @@ def build_case(M, N, op_kind, dtype, block_m=None, tile_n=None):
     ncfg = _nsplit_config(M, N, dtype, vector_cores)
     if ncfg is not None:
         return _build_nsplit_dispatch(
-            M, N, op_kind, dtype,
+            M,
+            N,
+            op_kind,
+            dtype,
             "float32" if dtype == "bfloat16" else dtype,
-            vector_cores, ncfg["tn"], ncfg["nchunk"],
+            vector_cores,
+            ncfg["tn"],
+            ncfg["nchunk"],
         )(block_m)
     if cfg["path"] == "narrow":
         kernel = _build_narrow(
-            M, N, op_kind, dtype,
+            M,
+            N,
+            op_kind,
+            dtype,
             "float32" if dtype == "bfloat16" else dtype,
             NPUUtils.get().get_aicore_num() * 2,
-            cfg["G"], cfg["bw"],
+            cfg["G"],
+            cfg["bw"],
         )(cfg["bw"] * cfg["G"])
     elif cfg["path"] == "resident":
         kernel = _build_resident(
-            M, N, op_kind, dtype,
+            M,
+            N,
+            op_kind,
+            dtype,
             "float32" if dtype == "bfloat16" else dtype,
             NPUUtils.get().get_aicore_num() * 2,
         )(block_m)
     else:
         tn = tile_n if tile_n is not None else cfg["tile_n"]
         kernel = _build_tiled(
-            M, N, op_kind, dtype,
+            M,
+            N,
+            op_kind,
+            dtype,
             "float32" if dtype == "bfloat16" else dtype,
-            NPUUtils.get().get_aicore_num() * 2, tn,
+            NPUUtils.get().get_aicore_num() * 2,
+            tn,
         )(block_m)
     return kernel
 

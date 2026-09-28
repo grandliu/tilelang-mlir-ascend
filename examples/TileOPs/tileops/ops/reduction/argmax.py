@@ -57,7 +57,9 @@ class ArgmaxFwdOp(_ReduceOpBase):
         kernel_map: Optional[Dict[str, Kernel]] = None,
     ):
         super().__init__(
-            dtype=dtype, dim=dim, keepdim=keepdim,
+            dtype=dtype,
+            dim=dim,
+            keepdim=keepdim,
             kernel_map=kernel_map,
         )
 

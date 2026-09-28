@@ -9,9 +9,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 _ARTIFACT_NAME = "SESSION_TIMING_ANALYSIS.md"
-_BLOCK = re.compile(
-    r"<!--\s*TILEOPS_SESSION_TIMING_V1\s*(\{.*?\})\s*-->", re.DOTALL
-)
+_BLOCK = re.compile(r"<!--\s*TILEOPS_SESSION_TIMING_V1\s*(\{.*?\})\s*-->", re.DOTALL)
 
 
 def _snake_case(value: str) -> str:
@@ -19,9 +17,7 @@ def _snake_case(value: str) -> str:
     return re.sub(r"[^a-zA-Z0-9]+", "_", value).strip("_").lower()
 
 
-def _operator_slugs(
-    root: Path, operator_catalog: list[dict[str, Any]]
-) -> dict[str, str]:
+def _operator_slugs(root: Path, operator_catalog: list[dict[str, Any]]) -> dict[str, str]:
     slugs: dict[str, str] = {}
     for meta_path in root.glob("tileops/kernels/**/.migration_meta.json"):
         try:

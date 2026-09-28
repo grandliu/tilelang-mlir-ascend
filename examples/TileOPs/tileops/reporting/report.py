@@ -263,7 +263,9 @@ def render_markdown(run: dict[str, Any]) -> str:
     summary = run.get("summary") or {}
     lines = [f"# TileOPs Evaluation Report: {run.get('operator', 'unknown')}", ""]
     lines.extend(_setup_tables_markdown(run))
-    analysis_header = "| Operator | Correctness | Avg Max Abs Error | Performance Shapes | Ratio Range |"
+    analysis_header = (
+        "| Operator | Correctness | Avg Max Abs Error | Performance Shapes | Ratio Range |"
+    )
     analysis_rule = "|---|---:|---:|---:|---:|"
     if _timing_enabled(run):
         analysis_header = (
@@ -545,7 +547,7 @@ def _session_timing_details(run: dict[str, Any], name: Any, operator_index: int)
         )
         body = (
             '<div class="table-wrap"><table><thead><tr><th>Phase / 环节</th>'
-            '<th>Duration / 耗时</th><th>Ratio / 占比</th><th>Detail / 说明</th>'
+            "<th>Duration / 耗时</th><th>Ratio / 占比</th><th>Detail / 说明</th>"
             f"</tr></thead><tbody>{rows}</tbody></table></div>"
         )
     else:
@@ -555,8 +557,8 @@ def _session_timing_details(run: dict[str, Any], name: Any, operator_index: int)
         f'<details class="case-detail timing-detail" id="timing-{operator_index}">'
         "<summary>"
         '<span class="case-index">Session Timing / Session 耗时</span>'
-        f'<strong>{_format_duration(timing.get("total_duration_s"))}</strong>'
-        f'<span>{html.escape(str(timing.get("status") or "N/A"))}</span>'
+        f"<strong>{_format_duration(timing.get('total_duration_s'))}</strong>"
+        f"<span>{html.escape(str(timing.get('status') or 'N/A'))}</span>"
         "</summary>"
         f'<div class="detail-grid">{body}</div></details>'
     )

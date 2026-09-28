@@ -35,7 +35,10 @@ T.vbrc(T.float32(BIG), sent_v)
 
 
 def main():
-    import py_compile, tempfile, os
+    import py_compile
+    import tempfile
+    import os
+
     for tag, code in (("SLOW", SLOW_SKELETON), ("FAST", FAST_SKELETON)):
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
             f.write(code)

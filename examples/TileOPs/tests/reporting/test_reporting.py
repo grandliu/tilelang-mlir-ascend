@@ -490,9 +490,7 @@ def test_runner_combines_user_marker_expression_with_smoke_exclusion(tmp_path, m
             encoding="utf-8",
         )
         if kwargs["target"] == "bench_demo.py":
-            Path(kwargs["env"]["TILEOPS_BENCHMARK_REPORT_PATH"]).with_suffix(
-                ".json"
-            ).write_text(
+            Path(kwargs["env"]["TILEOPS_BENCHMARK_REPORT_PATH"]).with_suffix(".json").write_text(
                 json.dumps(
                     {
                         "schema_version": 1,
@@ -751,9 +749,7 @@ def test_session_timing_auto_discovery_supports_multi_operator_reports(tmp_path)
     metadata.write_text(
         json.dumps({"op_name": "AlphaOp", "op_slug": "alpha_task"}), encoding="utf-8"
     )
-    _write_session_timing(
-        tmp_path / "alpha_task" / "SESSION_TIMING_ANALYSIS.md", "AlphaOp"
-    )
+    _write_session_timing(tmp_path / "alpha_task" / "SESSION_TIMING_ANALYSIS.md", "AlphaOp")
     run = {
         "operators": [{"operator": "AlphaOp"}, {"operator": "BetaOp"}],
     }

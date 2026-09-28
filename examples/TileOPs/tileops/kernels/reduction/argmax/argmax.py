@@ -52,8 +52,7 @@ from tileops.kernels.reduction._primitives import DEFAULT_ALIGNMENT, align_up
 # from .argmax_kernel import _argreduce_kernel
 # from .argmax_kernel._argreduce_kernel import _select_config
 # --- perf_opt (Stage 4 tuned) ------------------------------------------------
-from .argmax_kernel.perf_opt._argreduce_kernel import _argreduce_kernel
-from .argmax_kernel.perf_opt._argreduce_kernel import _select_config
+from .argmax_kernel.perf_opt._argreduce_kernel import _argreduce_kernel, _select_config
 
 __all__ = ["ArgreduceKernel"]
 
@@ -157,9 +156,7 @@ class ArgreduceKernel(Kernel):
         # Op-layer prep ops (movedim/contiguous transposes) and sibling
         # kernels of multi-launch dispatches. The baseline (Stage 3) source
         # declares nothing and falls back to "main".
-        self.msprof_kernel_name = (
-            getattr(self.kernel, "msprof_kernel_name", None) or "main"
-        )
+        self.msprof_kernel_name = getattr(self.kernel, "msprof_kernel_name", None) or "main"
         # K8: init_config(config) -- no tune argument.
         self.init_config(config)
 

@@ -43,10 +43,21 @@ from tileops.ops.op_base import Op
 # Note: argmax/argmin are deliberately absent — a 0-D input falls through
 # to the kernel path, which raises the pre-existing
 # ``ValueError("Input tensor must be at least 1D")``.
-_SCALAR_REDUCE_KINDS = frozenset({
-    "sum", "mean", "amin", "amax", "prod", "std", "var", "var_mean",
-    "all", "any", "count_nonzero",
-})
+_SCALAR_REDUCE_KINDS = frozenset(
+    {
+        "sum",
+        "mean",
+        "amin",
+        "amax",
+        "prod",
+        "std",
+        "var",
+        "var_mean",
+        "all",
+        "any",
+        "count_nonzero",
+    }
+)
 
 __all__ = ["_ReduceOpBase"]
 
@@ -123,22 +134,17 @@ class _ReduceOpBase(Op):
         dim = self.dim
         if isinstance(dim, bool):
             raise TypeError(
-                f"dim must not be bool (subclasses int but is not a valid "
-                f"axis), got {dim!r}"
+                f"dim must not be bool (subclasses int but is not a valid axis), got {dim!r}"
             )
         if dim is None or isinstance(dim, int):
             return
         if isinstance(dim, (list, tuple)):
             for d in dim:
                 if isinstance(d, bool) or not isinstance(d, int):
-                    raise TypeError(
-                        f"All elements of dim must be int (not bool), "
-                        f"got {dim!r}"
-                    )
+                    raise TypeError(f"All elements of dim must be int (not bool), got {dim!r}")
             return
         raise TypeError(
-            f"dim must be int, list[int], tuple[int, ...], or None, "
-            f"got {type(dim).__name__}"
+            f"dim must be int, list[int], tuple[int, ...], or None, got {type(dim).__name__}"
         )
 
     @property
@@ -246,8 +252,7 @@ class _ReduceOpBase(Op):
         if isinstance(dim, int):
             if dim not in (0, -1):
                 raise IndexError(
-                    f"Dimension out of range (expected to be in range of "
-                    f"[-1, 0], but got {dim})"
+                    f"Dimension out of range (expected to be in range of [-1, 0], but got {dim})"
                 )
             return
         if isinstance(dim, (list, tuple)):
@@ -255,14 +260,11 @@ class _ReduceOpBase(Op):
             for d in dim:
                 if d not in (0, -1):
                     raise IndexError(
-                        f"Dimension out of range (expected to be in range of "
-                        f"[-1, 0], but got {d})"
+                        f"Dimension out of range (expected to be in range of [-1, 0], but got {d})"
                     )
                 canon = 0  # 0 and -1 alias the same axis on a 0-D tensor.
                 if canon in seen:
-                    raise RuntimeError(
-                        f"dim {canon} appears multiple times in the list of dims"
-                    )
+                    raise RuntimeError(f"dim {canon} appears multiple times in the list of dims")
                 seen.add(canon)
             return
 
@@ -405,7 +407,10 @@ class _ReduceOpBase(Op):
         if key not in self._kernel_cache:
             kernel_cls = self.kernel_map[self._kernel_key]
             self._kernel_cache[key] = kernel_cls(
-                M, N, self._op_kind, self.dtype,
+                M,
+                N,
+                self._op_kind,
+                self.dtype,
                 **self._build_kernel_kwargs(),
             )
             # Lift the per-shape msprof anchor (Kernel-level declaration,
@@ -421,7 +426,8 @@ class _ReduceOpBase(Op):
     # Input preparation (validate → transpose → reshape → pad)
 
     def _prepare_input(
-        self, x: torch.Tensor,
+        self,
+        x: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Size, object, object]:
         """Validate, derive M/N, transpose, reshape to 2D, optionally pad.
 
@@ -441,7 +447,9 @@ class _ReduceOpBase(Op):
         # --- multi-dim path (includes dim=None for full reduction) ---
         if isinstance(self.dim, (list, tuple)) or self.dim is None:
             dims = normalize_dim(
-                self.dim, x.ndim, empty_dim_policy=self._empty_dim_policy,
+                self.dim,
+                x.ndim,
+                empty_dim_policy=self._empty_dim_policy,
             )
             x, orig_shape, _kept = flatten_for_multidim(x, dims)
             N = x.shape[-1]
@@ -488,7 +496,10 @@ class _ReduceOpBase(Op):
     # Output reshape
 
     def _reshape_output(
-        self, y: torch.Tensor, orig_shape: torch.Size, dim_info: Union[int, List[int]],
+        self,
+        y: torch.Tensor,
+        orig_shape: torch.Size,
+        dim_info: Union[int, List[int]],
     ) -> torch.Tensor:
         """Reshape (M,) kernel output to match keepdim setting.
 

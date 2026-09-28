@@ -74,7 +74,10 @@ def _build(M, N, tile_n, inplace):
 
                 for t in T.serial(num_full - 1):
                     T.copy(
-                        x[pid * bm : pid * bm + bm, (t + 1) * tile_n : (t + 2) * tile_n],
+                        x[
+                            pid * bm : pid * bm + bm,
+                            (t + 1) * tile_n : (t + 2) * tile_n,
+                        ],
                         x_ub,
                     )
                     T.copy(x_ub, x_work)
@@ -82,7 +85,9 @@ def _build(M, N, tile_n, inplace):
                     T.vbrc(chunk, brc)
                     for i, j in T.Parallel(bm, tile_n):
                         cand[i, j] = T.if_then_else(
-                            x_work[i, j] == brc[i, j], T.cast(j, "float32"), T.float32(BIG)
+                            x_work[i, j] == brc[i, j],
+                            T.cast(j, "float32"),
+                            T.float32(BIG),
                         )
                     T.reduce_min(cand, first, dim=1)
                     for i in T.Parallel(bm):
@@ -117,8 +122,12 @@ def main():
     ref = x.argmax(dim=-1).cpu()
 
     y_ok = _build(M, N, tile_n, inplace=False)(x)
-    assert torch.equal(y_ok.cpu(), ref), f"noalias wrong: {y_ok.cpu().tolist()} vs {ref.tolist()}"
-    print(f"[workaround] noalias bit-exact PASS: {y_ok.cpu().tolist()} == {ref.tolist()}")
+    assert torch.equal(y_ok.cpu(), ref), (
+        f"noalias wrong: {y_ok.cpu().tolist()} vs {ref.tolist()}"
+    )
+    print(
+        f"[workaround] noalias bit-exact PASS: {y_ok.cpu().tolist()} == {ref.tolist()}"
+    )
 
     y_bug = _build(M, N, tile_n, inplace=True)(x)
     print(f"[bug demo]   inplace got {y_bug.cpu().tolist()} (want {ref.tolist()})")

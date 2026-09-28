@@ -4,7 +4,10 @@ scalarizes at bm>=2 regardless of operand form (ext_brc materialized + fragment
 staging still 0.95 scalar); the explicit vector-op chain is the fast path.
 Assertion: fused form >= 3x slower on (2048,4096) fp16 bm=2; both bit-exact.First verified: 2026-09-28, tilelang 0.1.2 (dev root build 2026-09-24) + CANN 8.5.0 / Ascend910B2C (argmax-_argreduce_kernel-stage4-20260928).
 """
-import os, time
+
+import os
+import time
+
 os.environ.setdefault("TILELANG_ASCEND_MODE", "Developer")
 import tilelang
 import tilelang.language as T
@@ -38,7 +41,7 @@ def build(fused):
                     bid = s * CORES + cid
                     if bid < (M + BM - 1) // BM:
                         off = bid * BM
-                        T.copy(x[off:off + BM, 0:N], x_ub[0:BM, 0:N])
+                        T.copy(x[off : off + BM, 0:N], x_ub[0:BM, 0:N])
                         T.copy(x_ub, x_w)
                         T.reduce_max(x_w, row_ext, dim=1)
                         T.vbrc(row_ext, ext_brc)
@@ -48,15 +51,19 @@ def build(fused):
                             for i, j in T.Parallel(BM, N):
                                 cand[i, j] = T.if_then_else(
                                     x_w[i, j] == ext_brc[i, j],
-                                    T.cast(j, "float32"), T.float32(BIG))
+                                    T.cast(j, "float32"),
+                                    T.float32(BIG),
+                                )
                         else:
                             T.vcmp(x_w, ext_brc, cmp_eq, "eq")
                             T.vselect(cmp_eq, idx_j, sent_v, cand)
                         T.reduce_min(cand, first, dim=1)
                         for i in T.Parallel(BM):
                             out_ub[i] = T.cast(first[i, 0], "int64")
-                        T.copy(out_ub[0:BM], out[off:off + BM])
+                        T.copy(out_ub[0:BM], out[off : off + BM])
+
         return main
+
     return _func(BM)
 
 
@@ -76,8 +83,10 @@ def main():
             k(x)
         torch.npu.synchronize()
         ts.append((time.perf_counter() - t0) / 20)
-    print(f"fused-ite(bm=2): {ts[0]*1e6:.1f}us  chain: {ts[1]*1e6:.1f}us  "
-          f"ratio={ts[0]/ts[1]:.2f}")
+    print(
+        f"fused-ite(bm=2): {ts[0] * 1e6:.1f}us  chain: {ts[1] * 1e6:.1f}us  "
+        f"ratio={ts[0] / ts[1]:.2f}"
+    )
     assert ts[0] >= 3 * ts[1], "bm>=2 fused-ite scalarization not reproduced"
     print("ASSERT PASS: TRAP-parallel2d-bm-ge2-scalarize reproduced")
 

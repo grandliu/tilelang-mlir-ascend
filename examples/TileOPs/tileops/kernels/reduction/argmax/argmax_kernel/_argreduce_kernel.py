@@ -160,9 +160,7 @@ def _select_config(M, N, dtype):
 
     # Basic ladder {1,2,4,8} (p=1 uses B_bm1 to account for ext_brc).
     candidates = [
-        p
-        for p in (1, 2, 4, 8)
-        if p * N * (B_bm1 if p == 1 else B_multi) <= UB_MANUAL_BUDGET
+        p for p in (1, 2, 4, 8) if p * N * (B_bm1 if p == 1 else B_multi) <= UB_MANUAL_BUDGET
     ]
     block_m = max(candidates) if candidates else None
 
@@ -175,11 +173,7 @@ def _select_config(M, N, dtype):
         # stays within 192KB; wide-N workloads do not engage the extended
         # ladder meaningfully (their basic-ladder bm is already budget-capped).
         ext_budget = UB_MANUAL_BUDGET if N >= TILE_ALIGNMENT else UB_MANUAL_BUDGET // 2
-        ext = [
-            p
-            for p in (16, 32, 64, 128, 256, 512, 1024, 2048)
-            if p * N * B_multi <= ext_budget
-        ]
+        ext = [p for p in (16, 32, 64, 128, 256, 512, 1024, 2048) if p * N * B_multi <= ext_budget]
         block_m = max(ext + [block_m])
 
     if block_m is None:
@@ -464,9 +458,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                         )
                                     T.reduce_min(cand, chunk_first, dim=1)
                                     for i in T.Parallel(block_m):
-                                        chunk_global[i, 0] = T.cast(
-                                            (t + 1) * tile_n, "float32"
-                                        ) + chunk_first[i, 0]
+                                        chunk_global[i, 0] = (
+                                            T.cast((t + 1) * tile_n, "float32") + chunk_first[i, 0]
+                                        )
                                     if op_kind == "argmax":
                                         T.vcmp(chunk_ext, running_ext, cond, "gt")
                                     else:
@@ -500,9 +494,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                     )
                                 T.reduce_min(cand_tail, tail_first, dim=1)
                                 for i in T.Parallel(block_m):
-                                    tail_global[i, 0] = T.cast(
-                                        num_full * tile_n, "float32"
-                                    ) + tail_first[i, 0]
+                                    tail_global[i, 0] = (
+                                        T.cast(num_full * tile_n, "float32") + tail_first[i, 0]
+                                    )
                                 if op_kind == "argmax":
                                     T.vcmp(tail_ext, running_ext, cond_tail, "gt")
                                 else:
@@ -587,9 +581,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                         )
                                     T.reduce_min(cand, chunk_first, dim=1)
                                     for i in T.Parallel(block_m):
-                                        chunk_global[i, 0] = T.cast(
-                                            (t + 1) * tile_n, "float32"
-                                        ) + chunk_first[i, 0]
+                                        chunk_global[i, 0] = (
+                                            T.cast((t + 1) * tile_n, "float32") + chunk_first[i, 0]
+                                        )
                                     if op_kind == "argmax":
                                         T.vcmp(chunk_ext, running_ext, cond, "gt")
                                     else:
@@ -623,9 +617,9 @@ def _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, tile_n):
                                     )
                                 T.reduce_min(cand_tail, tail_first, dim=1)
                                 for i in T.Parallel(block_m):
-                                    tail_global[i, 0] = T.cast(
-                                        num_full * tile_n, "float32"
-                                    ) + tail_first[i, 0]
+                                    tail_global[i, 0] = (
+                                        T.cast(num_full * tile_n, "float32") + tail_first[i, 0]
+                                    )
                                 if op_kind == "argmax":
                                     T.vcmp(tail_ext, running_ext, cond_tail, "gt")
                                 else:
@@ -656,9 +650,7 @@ def _argreduce_kernel(M, N, op_kind, dtype):
     UB-budget-driven block_m / tile_n (DESIGN.md sections 5.2 / 5.5).
     """
     if op_kind not in _KINDS:
-        raise ValueError(
-            f"unsupported op_kind {op_kind!r}; expected one of {sorted(_KINDS)}"
-        )
+        raise ValueError(f"unsupported op_kind {op_kind!r}; expected one of {sorted(_KINDS)}")
     if dtype not in _SUPPORTED_DTYPES:
         raise ValueError(
             f"unsupported dtype {dtype!r}; expected one of {sorted(_SUPPORTED_DTYPES)}"
@@ -672,9 +664,7 @@ def _argreduce_kernel(M, N, op_kind, dtype):
 
     if cfg["path"] == "resident":
         return _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores)
-    return _build_tiled(
-        M, N, op_kind, dtype, work_dtype, vector_cores, cfg["tile_n"]
-    )
+    return _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, cfg["tile_n"])
 
 
 # ---------------------------------------------------------------------------

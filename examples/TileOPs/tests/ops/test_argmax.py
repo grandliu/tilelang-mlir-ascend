@@ -34,6 +34,7 @@ def _call(op, x: torch.Tensor) -> torch.Tensor:
     """
     return cast(torch.Tensor, op(x))
 
+
 # Fixtures
 
 
@@ -311,10 +312,13 @@ def test_argmax_spec_dim(shape: tuple, dim: int, keepdim: bool, dtype: torch.dty
 
 
 @pytest.mark.smoke
-@pytest.mark.parametrize("op_cls_path, dim", [
-    ("tileops.ops.reduction.argmax.ArgmaxFwdOp", [0, 1]),
-    ("tileops.ops.reduction.argmax.ArgmaxFwdOp", (0, 1)),
-])
+@pytest.mark.parametrize(
+    "op_cls_path, dim",
+    [
+        ("tileops.ops.reduction.argmax.ArgmaxFwdOp", [0, 1]),
+        ("tileops.ops.reduction.argmax.ArgmaxFwdOp", (0, 1)),
+    ],
+)
 def test_argmax_rejects_multidim(op_cls_path: str, dim) -> None:
     """ArgmaxFwdOp only supports scalar dim or None; list/tuple must raise."""
     import importlib
@@ -375,7 +379,9 @@ def test_argmax_dim_none(shape: tuple, dtype: torch.dtype) -> None:
 
     y_keep = _call(ArgmaxFwdOp(dtype=dtype, dim=None, keepdim=True), x)
     expected_shape = tuple(1 for _ in shape)
-    assert y_keep.shape == expected_shape, f"keepdim shape mismatch: {y_keep.shape} vs {expected_shape}"
+    assert y_keep.shape == expected_shape, (
+        f"keepdim shape mismatch: {y_keep.shape} vs {expected_shape}"
+    )
     assert torch.equal(y_keep.reshape(()), ref_flat), (
         f"dim=None keepdim argmax value mismatch on shape={shape} dtype={dtype}"
     )
