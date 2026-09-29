@@ -263,7 +263,7 @@ examples/{project}/{op}/                        # standalone / plain / optimize 
 
 > 机制设计：执行 → Session 耗时分析 → 复盘 → 蒸馏 → 分级合入 → 检索（价值点四分类 D/P/R/C 与 Tier 治理的权威定义见 `tilelang-skill-evolution` skill 与其 references/distillation-rules.md、merge-policy.md）。你在本机制中只做四件事——**harness Stage 5 后生成 Session 耗时分析、终态蒸馏调度、重试 prompt 注入读取提示、harness 函数间教训搬运**；蒸馏与合入由 `@tilelang-skill-evolver` 执行，你**不得**自行编辑任何 skill / agent 文件（queue/stats 由 evolver 独占维护）。
 
-**Stage 5 后 Session 耗时分析（harness 必执行）**：按 `conductor-scenarios/harness.md` §7.1 的原文 prompt 与输出契约生成 op 级 `SESSION_TIMING_ANALYSIS.md`；该环节不是新 Stage，必须先于报告重渲染、终态蒸馏和最终报告。
+**Stage 5 后 Session 耗时分析（harness 必执行）**：按 `conductor-scenarios/harness.md` §7.1 的原文 prompt，先用本次 session id 执行 `opencode export <session_id> > examples/{op_slug}/full.json`，再只基于该 JSON 按输出契约生成 `examples/{op_slug}/SESSION_TIMING_ANALYSIS.md`。该环节不是新 Stage，必须先于报告重渲染、终态蒸馏和最终报告。
 
 ### 1. 任务终态蒸馏钩子（必执行）
 
