@@ -72,6 +72,10 @@ TILE_ALIGNMENT = 256
 # (DESIGN.md section 5.2; REVIEW blocking-1 fix).
 _LAUNCH_GATE = 96
 
+# FIX (2026-09-30): cache of precomputed (block_m, N) f32 index tensors for
+# the resident path's GM idx input (see _argreduce_kernel resident branch).
+_IDX_INPUT_CACHE: dict = {}
+
 _SUPPORTED_DTYPES = ("float16", "float32", "bfloat16")
 _KINDS = ("argmax", "argmin")
 
@@ -255,8 +259,12 @@ def _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores):
         vbrc(ext) -> vcmp("eq") -> vselect(idx_j, sent_v) -> reduce_min
     - ext_brc is materialized via T.vbrc for ALL bm (no (bm,1) broadcast
       operand inside any Parallel condition; C-2 moot, bm=1/bm>=2 unified).
-    - idx_j (column indices via T.arange [0,1]) and sent_v (BIG sentinel via
-      scalar T.vbrc) are task-invariant and hoisted before the task loop.
+    - idx_j (column indices) is loaded from a GM input tensor via the
+      flag-synchronized MTE2 copy (FIX 2026-09-30: replaces the in-kernel
+      ``T.arange -> T.vbrc`` pair, which races under padded-stride layouts
+      N%16 in [9,12] with bm>=2 -- see upload/data/argmax_minimal_repro/);
+      sent_v (BIG sentinel via scalar T.vbrc) stays task-invariant and
+      hoisted before the task loop.
     - x_frag staging dropped: compute (reduce_max/vcmp) reads x_ub directly
       (vcmp-on-shared proven by T.vselect.md section 2.4 example); keeps the
       chain buffer set within the x2 auto-multi-buffer envelope at bm=2.
@@ -264,7 +272,7 @@ def _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores):
     """
     is_bf16 = dtype == "bfloat16"
 
-    @tilelang.jit(out_idx=[1], target="npuir")
+    @tilelang.jit(out_idx=[2], target="npuir")
     def _func(block_m):
         num_logical = _ceildiv(M, block_m)
         num_kernels = min(num_logical, vector_cores)
@@ -273,32 +281,33 @@ def _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores):
         if is_bf16:
 
             @T.prim_func
-            def main(x: T.Tensor((M, N), dtype), out: T.Tensor((M,), "int64")):
+            def main(
+                x: T.Tensor((M, N), dtype),
+                idx: T.Tensor((block_m, N), "float32"),
+                out: T.Tensor((M,), "int64"),
+            ):
                 with T.Kernel(num_kernels, is_npu=True) as (cid, _):
                     x_ub = T.alloc_shared((block_m, N), dtype)
                     x_work = T.alloc_fragment((block_m, N), "float32")
                     row_ext = T.alloc_fragment((block_m, 1), "float32")
                     ext_brc = T.alloc_fragment((block_m, N), "float32")
                     cmp_eq = T.alloc_fragment((block_m, N), "bool")
-                    idx_row = T.alloc_fragment((1, N), "float32")
-                    idx_j = T.alloc_fragment((block_m, N), "float32")
+                    idx_j = T.alloc_shared((block_m, N), "float32")
                     sent_v = T.alloc_fragment((block_m, N), "float32")
                     cand = T.alloc_fragment((block_m, N), "float32")
                     first = T.alloc_fragment((block_m, 1), "float32")
                     out_ub = T.alloc_shared((block_m,), "int64")
 
                     # Task-invariant operands hoisted out of the task loop.
-                    # ROUND-4-B: T.arange on (bm, N) is scalar-executed
-                    # (~0.7-2ns/elem; r3a/r3d bisect). Materialize the index
-                    # row once at (1, N) and first-axis-broadcast it into
-                    # (bm, N) (documented vbrc src (1,N,K)->(M,N,K) form).
-                    # bm=1: identical shapes give vbrc an empty broadcast
-                    # dims array (MLIR verify fail) -- arange idx_j directly.
-                    if block_m >= 2:
-                        T.arange(idx_row, [0, 1], 0)
-                        T.vbrc(idx_row, idx_j)
-                    else:
-                        T.arange(idx_j, [0, 1], 0)
+                    # FIX (2026-09-30): idx_j comes from the GM input via the
+                    # flag-synchronized MTE2 copy (same path as x), replacing
+                    # the in-kernel ``T.arange -> T.vbrc`` pair. That pair
+                    # races under padded-stride layouts (N%16 in [9,12],
+                    # bm>=2): arange lowers to a scalar store loop whose tail
+                    # writes lose to the VCOPY broadcast read/write, leaving
+                    # stale UB in idx_j's block-first-row tail lanes.
+                    # Bisect evidence: upload/data/argmax_minimal_repro/.
+                    T.copy(idx[0:block_m, 0:N], idx_j[0:block_m, 0:N])
                     T.vbrc(T.float32(BIG), sent_v)
 
                     for s in T.serial(num_local_tasks):
@@ -323,31 +332,27 @@ def _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores):
         else:
 
             @T.prim_func
-            def main(x: T.Tensor((M, N), dtype), out: T.Tensor((M,), "int64")):
+            def main(
+                x: T.Tensor((M, N), dtype),
+                idx: T.Tensor((block_m, N), "float32"),
+                out: T.Tensor((M,), "int64"),
+            ):
                 with T.Kernel(num_kernels, is_npu=True) as (cid, _):
                     x_ub = T.alloc_shared((block_m, N), dtype)
                     row_ext = T.alloc_fragment((block_m, 1), dtype)
                     ext_brc = T.alloc_fragment((block_m, N), dtype)
                     cmp_eq = T.alloc_fragment((block_m, N), "bool")
-                    idx_row = T.alloc_fragment((1, N), "float32")
-                    idx_j = T.alloc_fragment((block_m, N), "float32")
+                    idx_j = T.alloc_shared((block_m, N), "float32")
                     sent_v = T.alloc_fragment((block_m, N), "float32")
                     cand = T.alloc_fragment((block_m, N), "float32")
                     first = T.alloc_fragment((block_m, 1), "float32")
                     out_ub = T.alloc_shared((block_m,), "int64")
 
                     # Task-invariant operands hoisted out of the task loop.
-                    # ROUND-4-B: T.arange on (bm, N) is scalar-executed
-                    # (~0.7-2ns/elem; r3a/r3d bisect). Materialize the index
-                    # row once at (1, N) and first-axis-broadcast it into
-                    # (bm, N) (documented vbrc src (1,N,K)->(M,N,K) form).
-                    # bm=1: identical shapes give vbrc an empty broadcast
-                    # dims array (MLIR verify fail) -- arange idx_j directly.
-                    if block_m >= 2:
-                        T.arange(idx_row, [0, 1], 0)
-                        T.vbrc(idx_row, idx_j)
-                    else:
-                        T.arange(idx_j, [0, 1], 0)
+                    # FIX (2026-09-30): same as the bf16 branch -- idx_j via
+                    # GM input + MTE2 copy, replacing arange -> vbrc (race
+                    # under padded-stride layouts, see bf16 branch comment).
+                    T.copy(idx[0:block_m, 0:N], idx_j[0:block_m, 0:N])
                     T.vbrc(T.float32(BIG), sent_v)
 
                     for s in T.serial(num_local_tasks):
@@ -977,8 +982,35 @@ def _argreduce_kernel(M, N, op_kind, dtype):
 
     if cfg["path"] == "resident":
         _f = _build_resident(M, N, op_kind, dtype, work_dtype, vector_cores)
-        _f.msprof_kernel_name = "main"
-        return _f
+
+        # FIX (2026-09-30): the resident kernel now takes a precomputed
+        # (block_m, N) f32 index tensor as its second GM input (loaded into
+        # idx_j via the flag-synchronized MTE2 copy inside the kernel,
+        # replacing the racy in-kernel arange -> vbrc pair; see
+        # _build_resident). This factory wrapper injects that tensor so the
+        # call API stays ``_argreduce_kernel(...)(block_m)(x)`` unchanged
+        # for the TileOPs wrapper, the L0 suite and the bench.
+        def _resident_factory(block_m):
+            raw_kernel = _f(block_m)
+
+            def launch(x):
+                key = (block_m, N, str(x.device))
+                idx_t = _IDX_INPUT_CACHE.get(key)
+                if idx_t is None:
+                    idx_t = (
+                        torch.arange(N, dtype=torch.float32)
+                        .unsqueeze(0)
+                        .expand(block_m, N)
+                        .contiguous()
+                        .to(x.device)
+                    )
+                    _IDX_INPUT_CACHE[key] = idx_t
+                return raw_kernel(x, idx_t)
+
+            return launch
+
+        _resident_factory.msprof_kernel_name = "main"
+        return _resident_factory
     _f = _build_tiled(M, N, op_kind, dtype, work_dtype, vector_cores, cfg["tile_n"])
     _f.msprof_kernel_name = "main"
     return _f
