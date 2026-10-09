@@ -32,7 +32,7 @@ T.arange(dst, strides: Union[list, tuple], offset=0)
 
 ### 2.3 特殊限制说明
 
-无
+`T.arange` 写入二维 `(1, N)` 缓冲（strides 含 0，如 `[0, 1]`）的输出若紧接 `T.vbrc` 做首轴广播，在特定 dtype / N 取值 / 广播行数组合下存在已知写入竞态（块首行尾部 lane 残留脏数据）。触发条件、症状与规避写法详见 `T.vbrc.md` 2.3 节。
 
 ### 2.4 使用方法
 
