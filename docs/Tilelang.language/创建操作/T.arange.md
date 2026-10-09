@@ -32,7 +32,39 @@ T.arange(dst, strides: Union[list, tuple], offset=0)
 
 ### 2.3 特殊限制说明
 
-`T.arange` 写入二维 `(1, N)` 缓冲（strides 含 0，如 `[0, 1]`）的输出若紧接 `T.vbrc` 做首轴广播，在特定 dtype / N 取值 / 广播行数组合下存在已知写入竞态（块首行尾部 lane 残留脏数据）。触发条件、症状与规避写法详见 `T.vbrc.md` 2.3 节。
+#### 2.3.1 问题说明
+
+已知限制：当二维 stride-0 `T.arange` 的输出被紧邻的 `T.vbrc` 读取时，两者之间可能没有建立正确的同步依赖。结果是 `T.vbrc` 已开始读取并广播，而 `T.arange` 对行尾部分 lane 的写入尚未完全可见，从而在广播结果中留下 stale UB 数据。
+
+该问题实测于 CANN 8.5.0 / Ascend910B2C；上述同步问题与工具链版本相关，升级后需重新验证。
+
+#### 2.3.2 触发条件
+
+当 `T.arange` 写入二维 `(1, N)` float32 缓冲，`strides` 含 0（如 `[0, 1]`），且输出紧接着作为 `T.vbrc` 的 src 时，同时满足以下条件可能触发竞态：
+
+1. 缓冲数据类型为 float32（实测域，其他 dtype 未验证）；
+2. `N mod 16 ∈ [9,12]`（行 stride 按 32B 补齐后 pad ≥ 4 个元素；对齐 N 或 pad ≤ 3 时实测正常）；
+3. 广播目标行数 `bm ≥ 2`（`bm=1` 免疫；`bm=2` 低概率仍可触发）。
+
+#### 2.3.3 竞态表现与验证注意事项
+
+- 仅 dst 的**块首行**（`row % bm == 0`）尾部约 4 个有效 lane 保持 stale UB 残留，例如 N=300 时为列 296..299，N=268 时为列 264..267；
+- `T.arange` 写入的 src 数据本身正确，其余行、其余列也正确；错误发生在二维 stride-0 arange 写入与后续向量广播读取之间的同步衔接；
+- 该问题具有 Heisenbug 特征：在 `T.arange` 与 `T.vbrc` 之间插入读取依赖（例如用 `T.print` 打印 src 尾部）会引入额外依赖或等待，使症状完全消失。实测对照为无 print 10/10 失败、有 print 0/10 失败，因此排查和验证必须以无 print 版本为准。
+
+#### 2.3.4 规避写法
+
+使用一维 `T.arange` 生成连续序列，再通过 `T.reshape` 构造 `(1, N)` 视图。该写法语义等价，不经过 stride-0 二维写入路径，实测无竞态：
+
+```python
+idx_src = T.alloc_shared((N,), "float32")
+idx_row = T.alloc_shared((1, N), "float32")
+T.arange(idx_src, [1], 0)      # 一维连续填充
+T.reshape(idx_src, idx_row)     # (N,) -> (1, N)，纯元数据零拷贝
+T.vbrc(idx_row, idx_j)
+```
+
+当 `bm == 1` 时，直接执行 `T.reshape(idx_src, idx_j)`，不要调用同形状 `(1, N) -> (1, N)` 的 `T.vbrc`；后者会产生空的 `broadcast_dims`，触发 MLIR verify 失败。
 
 ### 2.4 使用方法
 
