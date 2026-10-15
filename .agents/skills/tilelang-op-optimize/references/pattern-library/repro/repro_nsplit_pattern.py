@@ -9,6 +9,8 @@ import torch_npu  # noqa: F401
 
 M, N, TN = 4, 102400, 5120
 NCHUNK, NUM_BLOCKS = N // TN, N // (2 * TN)
+
+
 def build_fused_nsplit():
     @tilelang.jit(out_idx=[3], target="npuir")
     def _jit():
@@ -43,7 +45,8 @@ def build_fused_nsplit():
                 global_first = T.alloc_ub((1, M), "float32")
                 first_flat = T.alloc_ub((M,), "float32")
                 out_ub = T.alloc_ub((M,), "int64")
-                T.arange(idx_src, [1], 0); T.reshape(idx_src, idx_r)
+                T.arange(idx_src, [1], 0)
+                T.reshape(idx_src, idx_r)
                 T.vbrc(T.float32(2**30), sentinel_r)
                 vid = cid * 2 + subid
                 for r in range(M):
@@ -71,7 +74,9 @@ def build_fused_nsplit():
                     T.reshape(global_first, first_flat)
                     T.vcast(first_flat, out_ub, round_mode="rint")
                     T.copy(out_ub, out)
+
         return argreduce_nsplit_fused
+
     previous_mode = os.environ.get("TILELANG_ASCEND_MODE")
     os.environ["TILELANG_ASCEND_MODE"] = "expert"
     try:
@@ -81,6 +86,8 @@ def build_fused_nsplit():
             os.environ.pop("TILELANG_ASCEND_MODE", None)
         else:
             os.environ["TILELANG_ASCEND_MODE"] = previous_mode
+
+
 def main():
     torch.manual_seed(0)
     x = torch.randn(M, N, dtype=torch.float16, device="npu")
@@ -94,5 +101,7 @@ def main():
     assert torch.equal(out.cpu(), reference), (out.cpu(), reference)
     assert int(out.cpu()[0]) == TN + 7
     print("ASSERT PASS: PL-1.20 Expert single-launch N-split reproduced")
+
+
 if __name__ == "__main__":
     main()
